@@ -179,6 +179,8 @@ const inputClass =
 const optionCardClass =
   "flex h-full cursor-pointer flex-col rounded-xl border border-zinc-800 bg-zinc-950 p-3 transition-colors hover:border-zinc-600 has-[:checked]:border-red-500 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-red-500";
 
+
+
 export default function QuoteForm() {
   const [state, formAction, isPending] = useActionState(
     submitQuote,
@@ -203,49 +205,94 @@ export default function QuoteForm() {
     <form action={formAction} noValidate className="space-y-6 text-zinc-100">
       <div className="grid gap-6 sm:grid-cols-2">
         <div>
-          <label htmlFor="fullName" className={labelClass}>
-            Full Name <span className="text-red-500">*</span>
+          <label htmlFor="firstName" className={labelClass}>
+            First Name <span className="text-red-500">*</span>
           </label>
           <input
-            id="fullName"
-            name="fullName"
+            id="firstName"
+            name="firstName"
             type="text"
-            autoComplete="name"
-            defaultValue={values.fullName}
+            autoComplete="given-name"
+            defaultValue={values.firstName}
             className={inputClass}
           />
-          <FieldError message={errors.fullName} />
+          <FieldError message={errors.firstName} />
         </div>
         <div>
-          <label htmlFor="phone" className={labelClass}>
-            Phone Number <span className="text-red-500">*</span>
+          <label htmlFor="lastName" className={labelClass}>
+            Last Name <span className="text-red-500">*</span>
           </label>
           <input
-            id="phone"
-            name="phone"
-            type="tel"
-            autoComplete="tel"
-            defaultValue={values.phone}
+            id="lastName"
+            name="lastName"
+            type="text"
+            autoComplete="family-name"
+            defaultValue={values.lastName}
             className={inputClass}
           />
-          <FieldError message={errors.phone} />
+          <FieldError message={errors.lastName} />
         </div>
       </div>
 
       <div>
-        <label htmlFor="vehicle" className={labelClass}>
-          Year, Make &amp; Model of Vehicle{" "}
-          <span className="text-red-500">*</span>
+        <label htmlFor="phone" className={labelClass}>
+          Phone Number <span className="text-red-500">*</span>
         </label>
         <input
-          id="vehicle"
-          name="vehicle"
-          type="text"
-          placeholder="e.g. 2018 Mercedes-AMG C63"
-          defaultValue={values.vehicle}
+          id="phone"
+          name="phone"
+          type="tel"
+          autoComplete="tel"
+          defaultValue={values.phone}
           className={inputClass}
         />
-        <FieldError message={errors.vehicle} />
+        <FieldError message={errors.phone} />
+      </div>
+
+      <div className="grid gap-6 sm:grid-cols-3">
+        <div>
+          <label htmlFor="vehicleYear" className={labelClass}>
+            Vehicle Year <span className="text-red-500">*</span>
+          </label>
+          <input
+            id="vehicleYear"
+            name="vehicleYear"
+            type="text"
+            inputMode="numeric"
+            placeholder="e.g. 2018"
+            defaultValue={values.vehicleYear}
+            className={inputClass}
+          />
+          <FieldError message={errors.vehicleYear} />
+        </div>
+        <div>
+          <label htmlFor="vehicleMake" className={labelClass}>
+            Make <span className="text-red-500">*</span>
+          </label>
+          <input
+            id="vehicleMake"
+            name="vehicleMake"
+            type="text"
+            placeholder="e.g. Mercedes-AMG"
+            defaultValue={values.vehicleMake}
+            className={inputClass}
+          />
+          <FieldError message={errors.vehicleMake} />
+        </div>
+        <div>
+          <label htmlFor="vehicleModel" className={labelClass}>
+            Model <span className="text-red-500">*</span>
+          </label>
+          <input
+            id="vehicleModel"
+            name="vehicleModel"
+            type="text"
+            placeholder="e.g. C63"
+            defaultValue={values.vehicleModel}
+            className={inputClass}
+          />
+          <FieldError message={errors.vehicleModel} />
+        </div>
       </div>
 
       <fieldset>
@@ -284,17 +331,17 @@ export default function QuoteForm() {
         <legend className={labelClass}>
           Which Windows Need Tint?{" "}
           <span className="text-xs font-normal text-zinc-400">
-            Pick one. Red = tinted.
+            Pick all that apply. Red = tinted.
           </span>
         </legend>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {windowOptions.map((option) => (
             <label key={option.value} className={optionCardClass}>
               <input
-                type="radio"
+                type="checkbox"
                 name="windows"
                 value={option.value}
-                defaultChecked={values.windows === option.value}
+                defaultChecked={values.windows?.includes(option.value)}
                 className="sr-only"
               />
               <CarDiagram tinted={option.tinted} />
@@ -315,6 +362,9 @@ export default function QuoteForm() {
         <select
           id="removal"
           name="removal"
+          // A <select> only applies defaultValue when it mounts, and React resets the form
+          // after each action. Keying on the submitted value remounts it with that value.
+          key={String(values.removal ?? "")}
           defaultValue={values.removal ?? ""}
           className={inputClass}
         >
@@ -331,17 +381,18 @@ export default function QuoteForm() {
       </div>
 
       <div>
-        <label htmlFor="comments" className={labelClass}>
+        <label htmlFor="comment" className={labelClass}>
           Comments
         </label>
         <textarea
-          id="comments"
-          name="comments"
+          id="comment"
+          name="comment"
           rows={4}
           placeholder="Shade preference, timing, anything else we should know"
-          defaultValue={values.comments}
+          defaultValue={values.comment}
           className={inputClass}
         />
+        <FieldError message={errors.comment} />
       </div>
 
       <div>
@@ -368,6 +419,7 @@ export default function QuoteForm() {
       >
         {isPending ? "Sending..." : "Request My Free Quote →"}
       </button>
+      <FieldError message={errors.form} />
     </form>
   );
 }
