@@ -23,7 +23,13 @@ const filmOptions = [
 ];
 
 // Car diagram segments, viewed from above with the front of the car on the right.
-type Segment = "back" | "rearSides" | "frontSides" | "windshield" | "strip";
+type Segment =
+  | "back"
+  | "rearSides"
+  | "frontSides"
+  | "windshield"
+  | "strip"
+  | "sunroof";
 
 const windowOptions: {
   value: string;
@@ -32,46 +38,40 @@ const windowOptions: {
   tinted: Segment[] | null;
 }[] = [
   {
-    value: "full",
-    label: "Full Tint",
-    description: "All sides + back glass",
-    tinted: ["back", "rearSides", "frontSides"],
+    value: "windshield",
+    label: "Full Front Windshield",
+    description: "Entire windshield",
+    tinted: ["windshield"],
   },
   {
-    value: "full-windshield",
-    label: "Full Tint + Windshield",
-    description: "Every window",
-    tinted: ["back", "rearSides", "frontSides", "windshield"],
-  },
-  {
-    value: "back-half",
-    label: "Back Half",
-    description: "Rear doors + back glass",
-    tinted: ["back", "rearSides"],
-  },
-  {
-    value: "front",
-    label: "Front Windows",
-    description: "Driver + passenger",
-    tinted: ["frontSides"],
-  },
-  {
-    value: "front-windshield",
-    label: "Front Windows + Windshield",
-    description: "Front doors + windshield",
-    tinted: ["frontSides", "windshield"],
-  },
-  {
-    value: "windshield-strip",
-    label: "Windshield Strip",
-    description: "Top strip only",
+    value: "sunstrip",
+    label: "Sunstrip",
+    description: "Top strip of windshield",
     tinted: ["strip"],
   },
   {
-    value: "other",
-    label: "Something Else",
-    description: "Tell us in comments",
-    tinted: null,
+    value: "front-sides",
+    label: "Front Driver & Passenger",
+    description: "Front door windows",
+    tinted: ["frontSides"],
+  },
+  {
+    value: "rear-sides",
+    label: "Rear Passenger Side Windows",
+    description: "Rear door + quarter windows",
+    tinted: ["rearSides"],
+  },
+  {
+    value: "rear-windshield",
+    label: "Rear Windshield",
+    description: "Back glass",
+    tinted: ["back"],
+  },
+  {
+    value: "sunroof",
+    label: "Sunroof",
+    description: "Sunroof or moonroof glass",
+    tinted: ["sunroof"],
   },
 ];
 
@@ -158,6 +158,14 @@ function CarDiagram({ tinted }: { tinted: Segment[] | null }) {
             height="18"
             rx="1.5"
             className={fill("windshield")}
+          />
+          <rect
+            x="44"
+            y="12"
+            width="14"
+            height="8"
+            rx="1.5"
+            className={fill("sunroof")}
           />
           {tinted.includes("strip") && (
             <rect x="76" y="7" width="2" height="18" className="fill-red-500" />

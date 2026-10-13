@@ -24,16 +24,16 @@ const requiredFields: Record<string, errorChecks> = {
 
 export async function submitQuote(_prevState: FormState, formData: FormData): Promise<FormState> {
   const values: Record<string, string | string[]> = {};
+  const errors: Record<string, string> = {};
+
   for (const [key, value] of formData.entries()) {
-    if (key !== "windows") {
-      values[key] = String(value).trim();
-      console.log(key, " ", value);
-    }
+    if (key === "windows" || key.startsWith("$ACTION")) continue;
+    values[key] = String(value).trim();
   }
   // Checkboxes send one "windows" entry per checked box, so collect them all.
   values.windows = formData.getAll("windows").map(String);
 
-  const errors: Record<string, string> = {};
+  
   for (const [field, dict] of Object.entries(requiredFields)) {
     const value = values[field];
     if (!value?.length){
@@ -68,17 +68,19 @@ export async function submitQuote(_prevState: FormState, formData: FormData): Pr
   }
 
   // Map form fields to columns explicitly so extra form keys never reach the database.
-  const { error } = await supabase 
-  .from('quote_requests')
-  .insert({
-    first_name: values.firstName,
-    last_name: values.lastName,
-    phone: phoneDigits,
-    vehicle_year: Number(values.vehicleYear),
-    vehicle_make: values.vehicleMake,
-    vehicle_model: values.vehicleModel,
-    source: "website",
-    comment: values.comment || null,
+    // Keys must match the SQL parameter names exactly; extra form keys never reach the database.
+  const { error } = await supabase.rpc("submit_quote_request", {
+    p_first_name: values.firstName,
+    p_last_name: values.lastName,
+    p_phone: phoneDigits,
+    p_vehicle_year: Number(values.vehicleYear),
+    p_vehicle_make: values.vehicleMake,
+    p_vehicle_model: values.vehicleModel,
+    p_source: "website",
+    p_film: values.film,
+    p_windows: values.windows,
+    p_removal: values.removal,
+    p_comment: values.comment || null,
   });
 
   if (error) {
