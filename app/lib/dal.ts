@@ -1,0 +1,21 @@
+import "server-only"; //data access layer
+import { cache } from "react";
+import { redirect } from "next/navigation";
+import { createClient } from "./supabase/server";
+
+// Every staff page and staff server action calls this before touching data.
+// cache() makes repeat calls within one request reuse the first result.
+export const requireStaff = cache(async () => {
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getClaims();
+
+  if (!data?.claims) {
+    redirect("/login");
+  }
+
+  return {
+    supabase,
+    userId: data.claims.sub,
+    email: data.claims.email as string | undefined,
+  };
+});
