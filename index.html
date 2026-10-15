@@ -114,6 +114,7 @@ h1 {
 .hint { grid-column: 1 / -1; margin: 0; max-width: 52ch; font-size: 0.92rem; color: var(--muted); }
 
 .btn {
+  box-sizing: border-box; /* <a> buttons default to content-box and overflow at width: 100% */
   display: inline-flex;
   align-items: center;
   justify-content: center;
