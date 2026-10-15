@@ -100,7 +100,12 @@ h1 {
   font-size: 1.8rem;
   line-height: 1.1;
   letter-spacing: 0.01em;
+  color: var(--brand, var(--ink));
 }
+/* Payment app brand colors (Zelle's purple is lightened to stay readable on black). */
+.method--venmo { --brand: #008cff; }
+.method--cashapp { --brand: #00d632; }
+.method--zelle { --brand: #9b5de5; }
 .handle {
   display: inline-block;
   margin-top: 2px;
@@ -158,7 +163,7 @@ h1 {
   </header>
 
   <ul class="methods">
-    <li class="method">
+    <li class="method method--venmo">
       <div class="info">
         <h2>Venmo</h2>
         <span class="handle">@herrera707</span>
@@ -166,7 +171,7 @@ h1 {
       <a class="btn" href="https://venmo.com/u/herrera707" target="_blank" rel="noopener">Open Venmo</a>
     </li>
 
-    <li class="method">
+    <li class="method method--cashapp">
       <div class="info">
         <h2>Cash App</h2>
         <span class="handle">$HerreraTinting</span>
@@ -174,7 +179,7 @@ h1 {
       <a class="btn" href="https://cash.app/$HerreraTinting" target="_blank" rel="noopener">Open Cash App</a>
     </li>
 
-    <li class="method">
+    <li class="method method--zelle">
       <div class="info">
         <h2>Zelle</h2>
         <span class="handle" id="zelle-num">707-508-9273</span>
