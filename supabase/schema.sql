@@ -142,3 +142,19 @@ revoke execute on function public.submit_quote_request(text, text, text, int, te
   from public, anon, authenticated;
 grant execute on function public.submit_quote_request(text, text, text, int, text, text, text, text, text[], text, text)
   to service_role;
+
+-- 6. Staff access: logged-in staff (the authenticated role) via app/lib/dal.ts.
+--    Sign-ups are disabled, so every authenticated user is staff.
+
+-- Layer 1: grants (which operations are allowed at all)
+grant select, insert, update on public.quote_requests to authenticated;
+grant select, insert, update, delete on public.quotes      to authenticated;
+grant select, insert, update, delete on public.quote_items to authenticated;
+
+-- Layer 2: RLS policies (which rows). Staff can see and work on every row.
+create policy "Staff read requests"   on public.quote_requests for select to authenticated using (true);
+create policy "Staff add requests"    on public.quote_requests for insert to authenticated with check (true);
+create policy "Staff update requests" on public.quote_requests for update to authenticated using (true) with check (true);
+
+create policy "Staff manage quotes"   on public.quotes      for all to authenticated using (true) with check (true);
+create policy "Staff manage items"    on public.quote_items for all to authenticated using (true) with check (true);

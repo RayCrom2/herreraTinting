@@ -1,15 +1,22 @@
+import { Suspense } from "react";
 import { requireStaff } from "../lib/dal";
 import { logout } from "../actions/auth";
 
-export default async function StaffLayout({ children }: { children: React.ReactNode }) {
+// Reads the session, so it streams in at request time inside <Suspense>.
+async function StaffEmail() {
   const { email } = await requireStaff();
+  return <span className="text-zinc-400">{email}</span>;
+}
 
+export default function StaffLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen text-zinc-100">
       <header className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
         <span className="font-semibold">Herrera Tinting · Staff</span>
         <div className="flex items-center gap-4 text-sm">
-          <span className="text-zinc-400">{email}</span>
+          <Suspense fallback={null}>
+            <StaffEmail />
+          </Suspense>
           <form action={logout}>
             <button type="submit" className="text-red-400 hover:underline">
               Log out
@@ -17,7 +24,9 @@ export default async function StaffLayout({ children }: { children: React.ReactN
           </form>
         </div>
       </header>
-      <main className="mx-auto max-w-5xl px-4 py-8">{children}</main>
+      <main className="mx-auto max-w-5xl px-4 py-8">
+        <Suspense fallback={<p className="text-zinc-400">Loading...</p>}>{children}</Suspense>
+      </main>
     </div>
   );
 }

@@ -28,7 +28,19 @@ export async function proxy(request: NextRequest) {
   );
 
   // Validates the session and refreshes expired tokens (which triggers setAll above).
-  await supabase.auth.getClaims();
+  const { data } = await supabase.auth.getClaims();
+
+  // Optimistic check: send logged-out visitors to /login before any staff UI streams.
+  // The real check is requireStaff() in each page and action.
+  if (!data?.claims && request.nextUrl.pathname.startsWith("/staff")) {
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = "/login";
+    loginUrl.search = "";
+    const redirect = NextResponse.redirect(loginUrl);
+    // Keep any cookie changes (e.g. a cleared expired session) on the redirect.
+    response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
+    return redirect;
+  }
 
   return response;
 }
