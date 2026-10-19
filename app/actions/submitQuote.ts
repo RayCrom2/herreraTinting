@@ -1,6 +1,6 @@
 "use server";
 import { FormState } from "../lib/quote";
-import { supabase } from "../lib/supabase";
+import { supabase } from "../lib/supabase/admin";
 
 interface errorChecks {
     message: string,
