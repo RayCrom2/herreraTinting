@@ -3,6 +3,7 @@
 -- WARNING: this is a fresh start. It DROPS quote_requests, quotes, quote_items and bookings
 -- (if they exist) and everything in them. Only run it while the data is test data.
 
+drop table if exists quote_links    cascade;
 drop table if exists bookings       cascade;
 drop table if exists quote_items    cascade;
 drop table if exists quotes         cascade;
@@ -42,7 +43,8 @@ create table quotes (
   duration_minutes  int  check (duration_minutes > 0),                          -- sum of item durations, set by staff
   staff_note        text,
 
-  unique (quote_request_id, film_type)          -- no two Ceramic quotes on one request
+  unique (quote_request_id, film_type),         -- no two Ceramic quotes on one request
+  unique (id, quote_request_id)                 -- lets quote_links reference (quote, request) as a pair
 );
 
 -- at most one removal-only quote (no film) per request
@@ -158,3 +160,90 @@ create policy "Staff update requests" on public.quote_requests for update to aut
 
 create policy "Staff manage quotes"   on public.quotes      for all to authenticated using (true) with check (true);
 create policy "Staff manage items"    on public.quote_items for all to authenticated using (true) with check (true);
+
+-- 7. Customer links: the no-login URL a customer opens to see and accept their quote.
+--    One live link per request. The URL token is never stored, only its SHA-256 hash,
+--    so a leaked table can't be turned back into working links.
+create table quote_links (
+  id                 uuid primary key default gen_random_uuid(),
+  quote_request_id   uuid not null references quote_requests(id) on delete cascade,
+
+  token_hash         text not null unique
+                     check (token_hash ~ '^[0-9a-f]{64}$'),   -- hex sha256; rejects a raw token by mistake
+
+  -- What people did. "Expired" isn't a status: a link is expired once expires_at < now().
+  status             text not null default 'active'
+                     check (status in ('active', 'accepted', 'declined', 'revoked')),
+  accepted_quote_id  uuid,                                     -- the film option the customer chose
+
+  created_at         timestamptz not null default now(),
+  expires_at         timestamptz not null default now() + interval '14 days',
+
+  check ((status = 'accepted') = (accepted_quote_id is not null)),
+
+  -- The accepted quote must belong to this link's own request (skipped while it's null).
+  constraint quote_links_accepted_quote_fkey
+    foreign key (accepted_quote_id, quote_request_id)
+    references quotes (id, quote_request_id)
+);
+
+-- at most one live link per request
+create unique index quote_links_one_active
+  on quote_links (quote_request_id)
+  where status = 'active';
+
+alter table quote_links enable row level security;
+
+-- Staff create links (via send_quote), see their status, and revoke them. No delete: keep the history.
+grant select, insert, update on public.quote_links to authenticated;
+create policy "Staff manage links" on public.quote_links for all to authenticated using (true) with check (true);
+
+-- The customer page and accept action look links up server-side with the secret key.
+grant select, update on public.quote_links to service_role;
+
+-- 8. Called by the staff "Send quote" action. Locks the request and creates its link in one
+--    transaction; if any check fails, nothing changes.
+create or replace function public.send_quote(
+  p_request_id  uuid,
+  p_token_hash  text      -- sha256 of the URL token, computed in the server action
+)
+returns uuid              -- the new quote_links.id
+language plpgsql
+security invoker          -- runs as the calling staff member, so their grants and RLS apply
+set search_path = ''
+as $$
+declare
+  v_link_id uuid;
+begin
+  -- "replied_at is null" makes this a one-time switch: a double click or two staff sending
+  -- at once can't both succeed.
+  update public.quote_requests
+  set replied_at = now()
+  where id = p_request_id and replied_at is null;
+
+  if not found then
+    raise exception 'Quote request not found or already sent';
+  end if;
+
+  -- Every window needs a price and a time before the customer sees it.
+  if exists (
+    select 1
+    from public.quote_items i
+    join public.quotes q on q.id = i.quote_id
+    where q.quote_request_id = p_request_id
+      and (i.price_cents is null or i.duration_minutes is null)
+  ) then
+    raise exception 'Every window needs a price and time before sending';
+  end if;
+
+  insert into public.quote_links (quote_request_id, token_hash)
+  values (p_request_id, p_token_hash)
+  returning id into v_link_id;
+
+  return v_link_id;
+end;
+$$;
+
+-- Only logged-in staff can send. (Every authenticated user is staff; see claude/memory.md.)
+revoke execute on function public.send_quote(uuid, text) from public, anon;
+grant execute on function public.send_quote(uuid, text) to authenticated;

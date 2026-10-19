@@ -30,19 +30,25 @@ export async function proxy(request: NextRequest) {
   // Validates the session and refreshes expired tokens (which triggers setAll above).
   const { data } = await supabase.auth.getClaims();
 
-  // Optimistic check: send logged-out visitors to /login before any staff UI streams.
-  // The real check is requireStaff() in each page and action.
-  if (!data?.claims && request.nextUrl.pathname.startsWith("/staff")) {
-    const loginUrl = request.nextUrl.clone();
-    loginUrl.pathname = "/login";
-    loginUrl.search = "";
-    const redirect = NextResponse.redirect(loginUrl);
-    // Keep any cookie changes (e.g. a cleared expired session) on the redirect.
-    response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
-    return redirect;
-  }
+  // Optimistic checks, so pages don't have to read the session just to bounce visitors.
+  // The real check is requireStaff() in each staff page and action.
+  const signedIn = Boolean(data?.claims);
+  const path = request.nextUrl.pathname;
+
+  if (!signedIn && path.startsWith("/staff")) return redirectTo("/login", request, response);
+  if (signedIn && path === "/login") return redirectTo("/staff", request, response);
 
   return response;
+}
+
+function redirectTo(pathname: string, request: NextRequest, response: NextResponse) {
+  const url = request.nextUrl.clone();
+  url.pathname = pathname;
+  url.search = "";
+  const redirect = NextResponse.redirect(url);
+  // Keep any cookie changes (e.g. a refreshed or cleared session) on the redirect.
+  response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
+  return redirect;
 }
 
 export const config = {

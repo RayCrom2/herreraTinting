@@ -13,7 +13,7 @@ const removalLabels: Record<string, string> = {
   "not-sure": "Not sure about removal",
 };
 
-export default function QuoteRequestPage({ params }: { params: Promise<{ id: string }> }) {
+export default function QuoteRequestPage({ params }: { params: Promise<{ requestId: string }> }) {
   return (
     <>
       <Link href="/staff" className="text-sm text-zinc-400 hover:text-zinc-200">
@@ -26,10 +26,10 @@ export default function QuoteRequestPage({ params }: { params: Promise<{ id: str
   );
 }
 
-async function QuoteRequestDetail({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+async function QuoteRequestDetail({ params }: { params: Promise<{ requestId: string }> }) {
+  const { requestId } = await params;
   // Postgres rejects malformed UUIDs with an error, so treat them as "not found" up front.
-  if (!UUID.test(id)) notFound();
+  if (!UUID.test(requestId)) notFound();
 
   const { supabase } = await requireStaff();
   const { data: request, error } = await supabase
@@ -39,7 +39,7 @@ async function QuoteRequestDetail({ params }: { params: Promise<{ id: string }> 
       vehicle_year, vehicle_make, vehicle_model, removal_request, comment, replied_at,
       quotes ( id, film_type, quote_items ( id, section, install, removal, price_cents, duration_minutes ) )
     `)
-    .eq("id", id)
+    .eq("id", requestId)
     .maybeSingle();
 
   if (error) throw new Error(`Failed to load quote request: ${error.message}`);
@@ -80,7 +80,12 @@ async function QuoteRequestDetail({ params }: { params: Promise<{ id: string }> 
         )}
       </header>
 
-      <PricingForm requestId={request.id} quotes={quotes} locked={locked} />
+      <PricingForm
+        requestId={request.id}
+        quotes={quotes}
+        locked={locked}
+        customer={{ firstName: request.first_name, phone: request.phone }}
+      />
     </>
   );
 }

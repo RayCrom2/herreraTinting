@@ -2,12 +2,14 @@
 
 import { startTransition, useActionState, useState } from "react";
 import { savePricing } from "../../../actions/pricing";
+import { sendQuote } from "../../../actions/sendQuote";
 import {
   dollarsToCents,
   filmLabels,
   formatMinutes,
   formatMoney,
   initialPricingState,
+  initialSendState,
   parseMinutes,
   sectionLabels,
   type PricingQuote,
@@ -18,19 +20,70 @@ type ItemInputs = Record<string, { price: string; minutes: string }>;
 const inputClass =
   "w-full rounded-lg border bg-black px-3 py-2 text-right text-zinc-100 tabular-nums focus:border-red-500 focus:outline-none disabled:opacity-60";
 
+const linkButtonClass =
+  "rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500";
+
+// Shown once after sending. The database keeps only the link's hash, so it can't be shown again.
+function CustomerLink({ url, message, customer }: { url: string; message: string; customer: Customer }) {
+  const [copied, setCopied] = useState<"link" | "message" | null>(null);
+  const text = `Hi ${customer.firstName}, your Herrera Tinting quote is ready: ${url}`;
+
+  async function copy(what: "link" | "message") {
+    await navigator.clipboard.writeText(what === "link" ? url : text);
+    setCopied(what);
+    setTimeout(() => setCopied(null), 2000);
+  }
+
+  return (
+    <div className="rounded-xl border border-emerald-700 bg-emerald-950/40 p-4">
+      <p className="text-sm text-emerald-300">{message}</p>
+      <input
+        readOnly
+        value={url}
+        aria-label="Customer link"
+        onFocus={(e) => e.target.select()}
+        className="mt-3 w-full rounded-lg border border-zinc-800 bg-black px-3 py-2 text-sm text-zinc-100"
+      />
+      <div className="mt-3 flex flex-wrap gap-2">
+        {customer.phone && (
+          // Opens the device's texting app with the message filled in. Reliable on phones;
+          // on computers it depends on what's installed, hence the copy buttons.
+          <a href={`sms:+1${customer.phone}?&body=${encodeURIComponent(text)}`} className={linkButtonClass}>
+            Text customer
+          </a>
+        )}
+        <button type="button" onClick={() => copy("message")} className={linkButtonClass}>
+          {copied === "message" ? "Copied" : "Copy message"}
+        </button>
+        <button type="button" onClick={() => copy("link")} className={linkButtonClass}>
+          {copied === "link" ? "Copied" : "Copy link"}
+        </button>
+      </div>
+      <p className="mt-2 text-xs text-zinc-400">
+        On a computer, use Copy message and paste it wherever you text from. The full link isn&apos;t
+        stored, so it can&apos;t be shown again after you leave this page.
+      </p>
+    </div>
+  );
+}
+
 function workLabel(install: boolean, removal: boolean) {
   if (install && removal) return "Removal + install";
   return removal ? "Removal only" : "Install";
 }
 
+type Customer = { firstName: string; phone: string | null };
+
 export default function PricingForm({
   requestId,
   quotes,
   locked,
+  customer,
 }: {
   requestId: string;
   quotes: PricingQuote[];
   locked: boolean;
+  customer: Customer;
 }) {
   const [state, formAction, isPending] = useActionState(savePricing, initialPricingState);
 
@@ -49,11 +102,30 @@ export default function PricingForm({
     ),
   );
 
+  const [sendState, sendAction, isSending] = useActionState(sendQuote, initialSendState);
+
+  // `quotes` holds what's saved in the database (it refreshes after each save);
+  // `inputs` holds what's typed. Sending uses the saved prices, so both must agree first.
+  const savedItems = quotes.flatMap((quote) => quote.items);
+  const hasUnsavedChanges = savedItems.some(
+    (item) =>
+      dollarsToCents(inputs[item.id].price) !== item.price_cents ||
+      parseMinutes(inputs[item.id].minutes) !== item.duration_minutes,
+  );
+  const fullyPriced = savedItems.every((item) => item.price_cents !== null && item.duration_minutes !== null);
+
   function setInput(itemId: string, field: "price" | "minutes", value: string) {
     setInputs((current) => ({ ...current, [itemId]: { ...current[itemId], [field]: value } }));
   }
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  function handleSend() {
+    if (!window.confirm("Send this quote? Prices lock once it's sent.")) return;
+    const formData = new FormData();
+    formData.set("requestId", requestId);
+    startTransition(() => sendAction(formData));
+  }
+
+  function handleSubmit(event: React.SubmitEvent<HTMLFormElement>) {
     // Submitting manually skips React's automatic form reset, so typed values stay put.
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
@@ -146,14 +218,29 @@ export default function PricingForm({
       </fieldset>
 
       {!locked && (
-        <div className="flex items-center gap-4">
-          <button
-            type="submit"
-            disabled={isPending}
-            className="rounded-full bg-red-600 px-6 py-3 font-bold text-white transition-colors hover:bg-red-500 disabled:opacity-60"
-          >
-            {isPending ? "Saving..." : "Save prices"}
-          </button>
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="submit"
+              disabled={isPending || isSending}
+              className="rounded-full bg-red-600 px-6 py-3 font-bold text-white transition-colors hover:bg-red-500 disabled:opacity-60"
+            >
+              {isPending ? "Saving..." : "Save prices"}
+            </button>
+            <button
+              type="button"
+              onClick={handleSend}
+              disabled={!fullyPriced || hasUnsavedChanges || isPending || isSending}
+              className="rounded-full border border-zinc-500 px-6 py-3 font-bold text-zinc-100 transition-colors hover:border-zinc-300 disabled:opacity-40"
+            >
+              {isSending ? "Sending..." : "Send quote"}
+            </button>
+          </div>
+          {hasUnsavedChanges ? (
+            <p className="text-sm text-zinc-400">Save your changes before sending.</p>
+          ) : (
+            !fullyPriced && <p className="text-sm text-zinc-400">Every window needs a price and time to send.</p>
+          )}
           {state.message && (
             <p
               role="status"
@@ -164,6 +251,13 @@ export default function PricingForm({
           )}
         </div>
       )}
+
+      {sendState.status === "error" && (
+        <p role="alert" className="text-sm text-red-400">
+          {sendState.message}
+        </p>
+      )}
+      {sendState.url && <CustomerLink url={sendState.url} message={sendState.message} customer={customer} />}
     </form>
   );
 }

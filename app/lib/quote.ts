@@ -11,6 +11,11 @@ export const filmLabels: Record<string, string> = {
   "pronano-ceramic": "ProNano Ceramic",
 };
 
+export const filmDescriptions: Record<string, string> = {
+  "c2-carbon": "Best value · great heat & UV rejection",
+  "pronano-ceramic": "Highest heat rejection",
+};
+
 // Keys are in display order, front of the car to back.
 export const sectionLabels: Record<string, string> = {
   windshield: "Windshield",
@@ -45,8 +50,8 @@ export function formatMoney(cents: number) {
 export function formatMinutes(total: number) {
   const hours = Math.floor(total / 60);
   const minutes = total % 60;
-  if (hours === 0) return `${minutes}m`;
-  return minutes === 0 ? `${hours}h` : `${hours}h ${minutes}m`;
+  if (hours === 0) return `${minutes} minutes`;
+  return minutes === 0 ? `${hours} hours` : `${hours} hours ${minutes} minutes`;
 }
 
 // "120", "120.5", "$1,200.00" -> cents. Blank -> null (not priced yet). Anything else -> NaN.
@@ -87,6 +92,19 @@ export type PricingState = {
 };
 
 export const initialPricingState: PricingState = { status: "idle", message: "", errors: {} };
+
+export type SendState = {
+  status: "idle" | "sent" | "error";
+  message: string;
+  url: string | null; // the customer link, returned once right after sending
+};
+
+export const initialSendState: SendState = { status: "idle", message: "", url: null };
+
+// Success re-renders the customer page with their answer, so only errors need a message.
+export type RespondState = { message: string | null };
+
+export const initialRespondState: RespondState = { message: null };
 
 export function formatPhone(digits: string | null) {
   if (!digits || digits.length !== 10) return digits ?? "";

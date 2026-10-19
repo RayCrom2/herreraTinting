@@ -23,6 +23,22 @@ To add the staff check:
 2. Replace `using (true)` in each policy with a check that `auth.uid()` is in that table. Do the same for `with check (true)`.
 3. Have `requireStaff()` check the same table and redirect anyone not in it.
 
+## Customer quote links: access without a login
+
+`/q/[token]` (`app/q/[token]/page.tsx`) is the second way into customer data that doesn't need a login, after the public quote form. Whoever holds a link can view that one request's quote. It works like a password-reset link.
+
+- **Lookup uses the secret key.** The page reads with the admin client, so RLS doesn't protect it. The page's own query is the only boundary.
+  - Select only what the customer may see: first name, car, and each quote's `total_cost_cents` / `duration_minutes`.
+  - Never select `quote_items` (per-window prices are private), phone, last name or `staff_note`.
+  - Every new field on this page widens what a leaked link exposes.
+- **Only the token's SHA-256 hash is stored** (`quote_links.token_hash`, with a format check). The real token exists only in the link itself: the message sent to the customer, their browser history, clipboards, and server request logs.
+- **Links expire after 14 days.** Staff revoke one by setting `status = 'revoked'`.
+  - Revoked and unknown links show the same "not valid" page, so the page never confirms that a link existed.
+  - Expiry is worked out from `expires_at`, never stored as a status.
+- **The page is `noindex` and `referrer: no-referrer`**, so the token stays out of search engines and out of Referer headers sent to other sites.
+- **Any customer action that changes data** (accept, decline, book) must re-check the token itself: hash it, then confirm the link is `active` and not expired. Never trust a quote or request ID sent from the page.
+- **Before adding anything sensitive behind these links** (payments, addresses, documents), add a second check, such as a one-time code texted to the customer.
+
 ## Other deliberate choices
 
 - **Secret key is server-only.** `app/lib/supabase/admin.ts` uses `SUPABASE_SECRET_KEY` (role `service_role`, bypasses RLS) and imports `server-only`. Never import it into a client component. Never give it a `NEXT_PUBLIC_` name.
