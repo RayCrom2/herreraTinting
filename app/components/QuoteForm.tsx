@@ -75,12 +75,6 @@ const windowOptions: {
   },
 ];
 
-const removalOptions = [
-  { value: "no", label: "No" },
-  { value: "yes", label: "Yes" },
-  { value: "not-sure", label: "Not sure" },
-];
-
 function CarDiagram({ tinted }: { tinted: Segment[] | null }) {
   const fill = (segment: Segment) =>
     tinted?.includes(segment) ? "fill-red-500" : "fill-zinc-700";
@@ -173,6 +167,30 @@ function CarDiagram({ tinted }: { tinted: Segment[] | null }) {
         </>
       )}
     </svg>
+  );
+}
+
+// One card per window area. Used for both "needs tint" and "needs removal".
+function WindowPicker({ name, selected }: { name: string; selected?: string | string[] }) {
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {windowOptions.map((option) => (
+        <label key={option.value} className={optionCardClass}>
+          <input
+            type="checkbox"
+            name={name}
+            value={option.value}
+            defaultChecked={Array.isArray(selected) && selected.includes(option.value)}
+            className="sr-only"
+          />
+          <CarDiagram tinted={option.tinted} />
+          <span className="mt-3 text-sm font-semibold">{option.label}</span>
+          <span className="mt-1 text-xs text-zinc-400">
+            {option.description}
+          </span>
+        </label>
+      ))}
+    </div>
   );
 }
 
@@ -342,51 +360,30 @@ export default function QuoteForm() {
             Pick all that apply. Red = tinted.
           </span>
         </legend>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {windowOptions.map((option) => (
-            <label key={option.value} className={optionCardClass}>
-              <input
-                type="checkbox"
-                name="windows"
-                value={option.value}
-                defaultChecked={values.windows?.includes(option.value)}
-                className="sr-only"
-              />
-              <CarDiagram tinted={option.tinted} />
-              <span className="mt-3 text-sm font-semibold">{option.label}</span>
-              <span className="mt-1 text-xs text-zinc-400">
-                {option.description}
-              </span>
-            </label>
-          ))}
-        </div>
+        <WindowPicker name="windows" selected={values.windows} />
         <FieldError message={errors.windows} />
       </fieldset>
 
-      <div>
-        <label htmlFor="removal" className={labelClass}>
-          Tint Removal? <span className="text-red-500">*</span>
+      {/* group: the "Not sure" box hides itself once any removal window is checked. */}
+      <fieldset className="group">
+        <legend className={labelClass}>
+          Which Windows Need Old Tint Removed?{" "}
+          <span className="text-xs font-normal text-zinc-400">
+            Pick all that apply, or leave blank if none.
+          </span>
+        </legend>
+        <WindowPicker name="removalWindows" selected={values.removalWindows} />
+        <label className="mt-3 flex items-center gap-3 text-sm text-zinc-300 group-has-[input[name=removalWindows]:checked]:hidden">
+          <input
+            type="checkbox"
+            name="removalNotSure"
+            defaultChecked={values.removalNotSure === "on"}
+            className="size-4 shrink-0 accent-red-500"
+          />
+          <span>Not sure if I have old tint</span>
         </label>
-        <select
-          id="removal"
-          name="removal"
-          // A <select> only applies defaultValue when it mounts, and React resets the form
-          // after each action. Keying on the submitted value remounts it with that value.
-          key={String(values.removal ?? "")}
-          defaultValue={values.removal ?? ""}
-          className={inputClass}
-        >
-          <option value="" disabled>
-            Select...
-          </option>
-          {removalOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-        <FieldError message={errors.removal} />
-      </div>
+        <FieldError message={errors.removalWindows} />
+      </fieldset>
 
       <div>
         <label htmlFor="comment" className={labelClass}>

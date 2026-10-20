@@ -18,7 +18,6 @@ const requiredFields: Record<string, errorChecks> = {
   vehicleModel: {message: "Please enter your vehicle's model.", maxLength: 50},
   film: {message: "Please choose a film type."},
   windows: {message: "Please choose which windows need tint."},
-  removal: {message: "Please let us know if you need tint removal."},
   terms: {message: "Please agree to the terms to continue."},
 };
 
@@ -27,11 +26,13 @@ export async function submitQuote(_prevState: FormState, formData: FormData): Pr
   const errors: Record<string, string> = {};
 
   for (const [key, value] of formData.entries()) {
-    if (key === "windows" || key.startsWith("$ACTION")) continue;
+    if (key === "windows" || key === "removalWindows" || key.startsWith("$ACTION")) continue;
     values[key] = String(value).trim();
   }
   // Checkboxes send one "windows" entry per checked box, so collect them all.
   values.windows = formData.getAll("windows").map(String);
+  values.removalWindows = formData.getAll("removalWindows").map(String);
+  const removalRequest = values.removalWindows.length > 0 ? "yes" : values.removalNotSure ? "not-sure" : "no";
 
   
   for (const [field, dict] of Object.entries(requiredFields)) {
@@ -79,7 +80,8 @@ export async function submitQuote(_prevState: FormState, formData: FormData): Pr
     p_source: "website",
     p_film: values.film,
     p_windows: values.windows,
-    p_removal: values.removal,
+    p_removal_request: removalRequest,
+    p_removal_windows: values.removalWindows,
     p_comment: values.comment || null,
   });
 

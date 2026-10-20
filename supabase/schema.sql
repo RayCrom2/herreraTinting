@@ -68,7 +68,7 @@ create table quote_items (
                     )),
 
   install           boolean not null default true,    -- put new tint on this area
-  removal           boolean not null default false,   -- take old tint off; true at submit when removal_request = 'yes'
+  removal           boolean not null default false,   -- take old tint off; window was in customer's removal list
   price_cents       int check (price_cents >= 0),     -- null until staff price it
   duration_minutes  int check (duration_minutes > 0), -- null until staff set it
 
@@ -87,6 +87,7 @@ grant select, insert, update, delete on public.quote_items    to service_role;
 
 -- 5. Called by app/actions/submitQuote.ts. Creates the request, one quote per film,
 --    and one item per window in a single transaction; any failure rolls back all of it.
+drop function if exists public.submit_quote_request(text, text, text, int, text, text, text, text, text[], text, text);
 create or replace function public.submit_quote_request(
   -- Parameters. Prefix them (p_) so they never clash with column names.
   p_first_name     text,
@@ -98,7 +99,8 @@ create or replace function public.submit_quote_request(
   p_source         text,
   p_film           text,     -- 'c2-carbon' | 'pronano-ceramic' | 'both'
   p_windows        text[],   -- e.g. {'front-sides','sunroof'}
-  p_removal        text,     -- 'no' | 'yes' | 'not-sure'
+  p_removal_request text,     -- 'yes' | 'no' | 'not-sure'
+  p_removal_windows text[],   -- e.g. {'front-sides','sunroof'}
   p_comment        text default null   -- optional, so it goes last
 )
 returns uuid                    -- the new quote_requests.id
@@ -117,7 +119,7 @@ begin
   end if;
 
   insert into public.quote_requests (first_name, last_name, phone, vehicle_year, vehicle_make, vehicle_model, removal_request, source, comment)
-  values (p_first_name, p_last_name, p_phone, p_vehicle_year, p_vehicle_make, p_vehicle_model, p_removal, p_source, p_comment)
+  values (p_first_name, p_last_name, p_phone, p_vehicle_year, p_vehicle_make, p_vehicle_model, p_removal_request, p_source, p_comment)
   returning id into v_request_id;
 
   v_films := case when p_film = 'both'
@@ -129,10 +131,11 @@ begin
     values (v_request_id, v_film)
     returning id into v_quote_id;
 
-    -- One item per window. install defaults to true.
-    insert into public.quote_items (quote_id, section, removal)
-    select v_quote_id, x, p_removal = 'yes'
-    from unnest(p_windows) as x;
+    -- One item per window.
+    insert into public.quote_items (quote_id, section, install, removal)
+    select v_quote_id, x, x = any(p_windows), x = any(p_removal_windows)
+    from (select distinct unnest(p_windows || p_removal_windows) as x) as s;
+
   end loop;
 
   return v_request_id;
@@ -140,9 +143,9 @@ end;
 $$;
 
 -- Only server code should call it
-revoke execute on function public.submit_quote_request(text, text, text, int, text, text, text, text, text[], text, text)
+revoke execute on function public.submit_quote_request(text, text, text, int, text, text, text, text, text[], text, text[], text)
   from public, anon, authenticated;
-grant execute on function public.submit_quote_request(text, text, text, int, text, text, text, text, text[], text, text)
+grant execute on function public.submit_quote_request(text, text, text, int, text, text, text, text, text[], text, text[], text)
   to service_role;
 
 -- 6. Staff access: logged-in staff (the authenticated role) via app/lib/dal.ts.
