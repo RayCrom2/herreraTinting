@@ -24,7 +24,15 @@ const linkButtonClass =
   "rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500";
 
 // Shown once after sending. The database keeps only the link's hash, so it can't be shown again.
-function CustomerLink({ url, message, customer }: { url: string; message: string; customer: Customer }) {
+function CustomerLink({
+  url,
+  message,
+  customer,
+}: {
+  url: string;
+  message: string;
+  customer: Customer;
+}) {
   const [copied, setCopied] = useState<"link" | "message" | null>(null);
   const text = `Hi ${customer.firstName}, your Herrera Tinting quote is ready: ${url}`;
 
@@ -48,28 +56,52 @@ function CustomerLink({ url, message, customer }: { url: string; message: string
         {customer.phone && (
           // Opens the device's texting app with the message filled in. Reliable on phones;
           // on computers it depends on what's installed, hence the copy buttons.
-          <a href={`sms:+1${customer.phone}?&body=${encodeURIComponent(text)}`} className={linkButtonClass}>
+          <a
+            href={`sms:+1${customer.phone}?&body=${encodeURIComponent(text)}`}
+            className={linkButtonClass}
+          >
             Text customer
           </a>
         )}
-        <button type="button" onClick={() => copy("message")} className={linkButtonClass}>
+        <button
+          type="button"
+          onClick={() => copy("message")}
+          className={linkButtonClass}
+        >
           {copied === "message" ? "Copied" : "Copy message"}
         </button>
-        <button type="button" onClick={() => copy("link")} className={linkButtonClass}>
+        <button
+          type="button"
+          onClick={() => copy("link")}
+          className={linkButtonClass}
+        >
           {copied === "link" ? "Copied" : "Copy link"}
         </button>
       </div>
       <p className="mt-2 text-xs text-zinc-400">
-        On a computer, use Copy message and paste it wherever you text from. The full link isn&apos;t
-        stored, so it can&apos;t be shown again after you leave this page.
+        On a computer, use Copy message and paste it wherever you text from. The
+        full link isn&apos;t stored, so it can&apos;t be shown again after you
+        leave this page.
       </p>
     </div>
   );
 }
 
-function workLabel(install: boolean, removal: boolean) {
-  if (install && removal) return "Removal + install";
-  return removal ? "Removal only" : "Install";
+// Read-only box showing whether the customer asked for this work on a window.
+function WorkCheck({ checked, label }: { checked: boolean; label: string }) {
+  return (
+    <div className="flex justify-center pt-2.5">
+      <span
+        role="img"
+        aria-label={`${label}: ${checked ? "yes" : "no"}`}
+        className={`flex h-5 w-5 items-center justify-center rounded border text-xs font-bold ${
+          checked ? "border-red-500 bg-red-600 text-white" : "border-zinc-700"
+        }`}
+      >
+        {checked && "✓"}
+      </span>
+    </div>
+  );
 }
 
 type Customer = { firstName: string; phone: string | null };
@@ -85,7 +117,10 @@ export default function PricingForm({
   locked: boolean;
   customer: Customer;
 }) {
-  const [state, formAction, isPending] = useActionState(savePricing, initialPricingState);
+  const [state, formAction, isPending] = useActionState(
+    savePricing,
+    initialPricingState,
+  );
 
   // Controlled so totals update as staff type.
   const [inputs, setInputs] = useState<ItemInputs>(() =>
@@ -94,15 +129,24 @@ export default function PricingForm({
         quote.items.map((item) => [
           item.id,
           {
-            price: item.price_cents === null ? "" : (item.price_cents / 100).toFixed(2),
-            minutes: item.duration_minutes === null ? "" : String(item.duration_minutes),
+            price:
+              item.price_cents === null
+                ? ""
+                : (item.price_cents / 100).toFixed(2),
+            minutes:
+              item.duration_minutes === null
+                ? ""
+                : String(item.duration_minutes),
           },
         ]),
       ),
     ),
   );
 
-  const [sendState, sendAction, isSending] = useActionState(sendQuote, initialSendState);
+  const [sendState, sendAction, isSending] = useActionState(
+    sendQuote,
+    initialSendState,
+  );
 
   // `quotes` holds what's saved in the database (it refreshes after each save);
   // `inputs` holds what's typed. Sending uses the saved prices, so both must agree first.
@@ -112,10 +156,15 @@ export default function PricingForm({
       dollarsToCents(inputs[item.id].price) !== item.price_cents ||
       parseMinutes(inputs[item.id].minutes) !== item.duration_minutes,
   );
-  const fullyPriced = savedItems.every((item) => item.price_cents !== null && item.duration_minutes !== null);
+  const fullyPriced = savedItems.every(
+    (item) => item.price_cents !== null && item.duration_minutes !== null,
+  );
 
   function setInput(itemId: string, field: "price" | "minutes", value: string) {
-    setInputs((current) => ({ ...current, [itemId]: { ...current[itemId], [field]: value } }));
+    setInputs((current) => ({
+      ...current,
+      [itemId]: { ...current[itemId], [field]: value },
+    }));
   }
 
   function handleSend() {
@@ -144,17 +193,29 @@ export default function PricingForm({
             const price = dollarsToCents(inputs[item.id].price);
             const minutes = parseMinutes(inputs[item.id].minutes);
             if (price !== null && !Number.isNaN(price)) totalCents += price;
-            if (minutes !== null && !Number.isNaN(minutes)) totalMinutes += minutes;
+            if (minutes !== null && !Number.isNaN(minutes))
+              totalMinutes += minutes;
           }
 
           return (
-            <section key={quote.id} className="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
+            <section
+              key={quote.id}
+              className="rounded-xl border border-zinc-800 bg-zinc-950 p-4"
+            >
               <h2 className="text-lg font-bold">
                 {quote.film_type ? filmLabels[quote.film_type] : "Removal only"}
               </h2>
 
-              <div className="mt-3 grid grid-cols-[minmax(0,1fr)_7rem_5.5rem] items-start gap-x-3 gap-y-3">
-                <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500">Window</span>
+              <div className="mt-3 grid grid-cols-[minmax(0,1fr)_4rem_4rem_7rem_5.5rem] items-start gap-x-3 gap-y-3">
+                <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500 pl-2">
+                  Item
+                </span>
+                <span className="text-center text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                  Install
+                </span>
+                <span className="text-center text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                  Remove
+                </span>
                 <span className="text-right text-xs font-semibold uppercase tracking-wide text-zinc-500">
                   Price ($)
                 </span>
@@ -171,9 +232,18 @@ export default function PricingForm({
                   return (
                     <div key={item.id} className="contents">
                       <div className="min-w-0 pt-2">
-                        <p className="font-medium">{sectionLabels[item.section]}</p>
-                        <p className="text-xs text-zinc-400">{workLabel(item.install, item.removal)}</p>
+                        <p className="font-medium">
+                          {sectionLabels[item.section]}
+                        </p>
                       </div>
+                      <WorkCheck
+                        checked={item.install}
+                        label={`${sectionLabels[item.section]} install`}
+                      />
+                      <WorkCheck
+                        checked={item.removal}
+                        label={`${sectionLabels[item.section]} removal`}
+                      />
                       <div>
                         <input
                           name={priceName}
@@ -181,10 +251,16 @@ export default function PricingForm({
                           placeholder="0.00"
                           aria-label={`${sectionLabels[item.section]} price`}
                           value={inputs[item.id].price}
-                          onChange={(e) => setInput(item.id, "price", e.target.value)}
+                          onChange={(e) =>
+                            setInput(item.id, "price", e.target.value)
+                          }
                           className={`${inputClass} ${priceError ? "border-red-500" : "border-zinc-800"}`}
                         />
-                        {priceError && <p className="mt-1 text-xs text-red-400">{priceError}</p>}
+                        {priceError && (
+                          <p className="mt-1 text-xs text-red-400">
+                            {priceError}
+                          </p>
+                        )}
                       </div>
                       <div>
                         <input
@@ -193,10 +269,16 @@ export default function PricingForm({
                           placeholder="0"
                           aria-label={`${sectionLabels[item.section]} minutes`}
                           value={inputs[item.id].minutes}
-                          onChange={(e) => setInput(item.id, "minutes", e.target.value)}
+                          onChange={(e) =>
+                            setInput(item.id, "minutes", e.target.value)
+                          }
                           className={`${inputClass} ${minutesError ? "border-red-500" : "border-zinc-800"}`}
                         />
-                        {minutesError && <p className="mt-1 text-xs text-red-400">{minutesError}</p>}
+                        {minutesError && (
+                          <p className="mt-1 text-xs text-red-400">
+                            {minutesError}
+                          </p>
+                        )}
                       </div>
                     </div>
                   );
@@ -208,7 +290,9 @@ export default function PricingForm({
                 <span className="text-lg font-bold tabular-nums">
                   {formatMoney(totalCents)}
                   <span className="ml-3 text-sm font-normal text-zinc-400">
-                    {totalMinutes > 0 ? formatMinutes(totalMinutes) : "No time set"}
+                    {totalMinutes > 0
+                      ? formatMinutes(totalMinutes)
+                      : "No time set"}
                   </span>
                 </span>
               </div>
@@ -230,16 +314,24 @@ export default function PricingForm({
             <button
               type="button"
               onClick={handleSend}
-              disabled={!fullyPriced || hasUnsavedChanges || isPending || isSending}
+              disabled={
+                !fullyPriced || hasUnsavedChanges || isPending || isSending
+              }
               className="rounded-full border border-zinc-500 px-6 py-3 font-bold text-zinc-100 transition-colors hover:border-zinc-300 disabled:opacity-40"
             >
               {isSending ? "Sending..." : "Send quote"}
             </button>
           </div>
           {hasUnsavedChanges ? (
-            <p className="text-sm text-zinc-400">Save your changes before sending.</p>
+            <p className="text-sm text-zinc-400">
+              Save your changes before sending.
+            </p>
           ) : (
-            !fullyPriced && <p className="text-sm text-zinc-400">Every window needs a price and time to send.</p>
+            !fullyPriced && (
+              <p className="text-sm text-zinc-400">
+                Every window needs a price and time to send.
+              </p>
+            )
           )}
           {state.message && (
             <p
@@ -257,7 +349,13 @@ export default function PricingForm({
           {sendState.message}
         </p>
       )}
-      {sendState.url && <CustomerLink url={sendState.url} message={sendState.message} customer={customer} />}
+      {sendState.url && (
+        <CustomerLink
+          url={sendState.url}
+          message={sendState.message}
+          customer={customer}
+        />
+      )}
     </form>
   );
 }

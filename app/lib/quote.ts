@@ -26,6 +26,9 @@ export const sectionLabels: Record<string, string> = {
   sunroof: "Sunroof",
 };
 
+// createQuoteToken() output: 32 bytes in base64url is always 43 characters.
+export const TOKEN = /^[A-Za-z0-9_-]{43}$/;
+
 const sectionOrder = Object.keys(sectionLabels);
 
 export function sortSections(sections: string[]) {
@@ -54,6 +57,15 @@ export function formatMinutes(total: number) {
   return minutes === 0 ? `${hours} hours` : `${hours} hours ${minutes} minutes`;
 }
 
+export function formatPhone(digits: string | null) {
+  if (!digits || digits.length !== 10) return digits ?? "";
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+
+export function formatProperNoun(s: string) {
+  if (!s) return;
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
 // "120", "120.5", "$1,200.00" -> cents. Blank -> null (not priced yet). Anything else -> NaN.
 export function dollarsToCents(input: string): number | null {
   const cleaned = input.replace(/[$,\s]/g, "");
@@ -106,10 +118,6 @@ export type RespondState = { message: string | null };
 
 export const initialRespondState: RespondState = { message: null };
 
-export function formatPhone(digits: string | null) {
-  if (!digits || digits.length !== 10) return digits ?? "";
-  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
-}
 
 // Fixed time zone so times match the shop's clock, whatever time zone the server is in.
 export const shopDateFormat = new Intl.DateTimeFormat("en-US", {

@@ -87,7 +87,6 @@ grant select, insert, update, delete on public.quote_items    to service_role;
 
 -- 5. Called by app/actions/submitQuote.ts. Creates the request, one quote per film,
 --    and one item per window in a single transaction; any failure rolls back all of it.
-drop function if exists public.submit_quote_request(text, text, text, int, text, text, text, text, text[], text, text);
 create or replace function public.submit_quote_request(
   -- Parameters. Prefix them (p_) so they never clash with column names.
   p_first_name     text,
