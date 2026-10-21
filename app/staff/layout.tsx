@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Suspense } from "react";
 import { requireStaff } from "../lib/dal";
 import { logout } from "../actions/auth";
@@ -12,7 +13,17 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
   return (
     <div className="min-h-screen text-zinc-100">
       <header className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
-        <span className="font-semibold">Herrera Tinting · Staff</span>
+        <div className="flex items-center gap-6">
+          <span className="font-semibold">Herrera Tinting · Staff</span>
+          <nav className="flex gap-4 text-sm text-zinc-400">
+            <Link href="/staff" className="hover:text-zinc-100">
+              Open quotes
+            </Link>
+            <Link href="/staff/sent" className="hover:text-zinc-100">
+              Sent quotes
+            </Link>
+          </nav>
+        </div>
         <div className="flex items-center gap-4 text-sm">
           <Suspense fallback={null}>
             <StaffEmail />

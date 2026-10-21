@@ -14,6 +14,22 @@ import PricingForm from "./PricingForm";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+export default function QuoteRequestPage({
+  params,
+}: {
+  params: Promise<{ requestId: string }>;
+}) {
+  return (
+    <>
+      <Suspense
+        fallback={<p className="mt-4 text-zinc-400">Loading quote...</p>}
+      >
+        <QuoteRequestDetail params={params} />
+      </Suspense>
+    </>
+  );
+}
+
 async function QuoteRequestDetail({
   params,
 }: {
@@ -92,25 +108,6 @@ async function QuoteRequestDetail({
         locked={locked}
         customer={{ firstName: request.first_name, phone: request.phone }}
       />
-    </>
-  );
-}
-
-export default function QuoteRequestPage({
-  params,
-}: {
-  params: Promise<{ requestId: string }>;
-}) {
-  return (
-    <>
-      <Link href="/staff" className="text-sm text-zinc-400 hover:text-zinc-200">
-        ← Open quotes
-      </Link>
-      <Suspense
-        fallback={<p className="mt-4 text-zinc-400">Loading quote...</p>}
-      >
-        <QuoteRequestDetail params={params} />
-      </Suspense>
     </>
   );
 }
