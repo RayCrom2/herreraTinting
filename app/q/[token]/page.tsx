@@ -10,6 +10,7 @@ import {
   formatMoney,
   sortByFilm,
   TOKEN,
+  formatProperNoun,
 } from "../../lib/quote";
 import { hashQuoteToken, isLinkExpired } from "../../lib/quoteLinks";
 import RespondButton from "./RespondButton";
@@ -78,12 +79,13 @@ async function CustomerQuote({
 
   return (
     <>
-      <h1 className="mt-3 text-3xl font-bold">
-        Hi {request.first_name}, here&apos;s your quote
+      <h1 className="mt-3 text-3xl">
+        Hi {request.first_name}, here&apos;s your quote for your{" "}
+        <span className="mt-2 text-zinc-400 font-bold">
+          {request.vehicle_year} {formatProperNoun(request.vehicle_make)}{" "}
+          {formatProperNoun(request.vehicle_model)}
+        </span>
       </h1>
-      <p className="mt-2 text-zinc-400">
-        {request.vehicle_year} {request.vehicle_make} {request.vehicle_model}
-      </p>
 
       {link.status === "accepted" && (
         <p className="mt-6 rounded-lg border border-emerald-700 bg-emerald-950/40 px-4 py-3 text-emerald-300">

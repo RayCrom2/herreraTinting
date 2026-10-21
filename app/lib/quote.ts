@@ -6,13 +6,34 @@ export type FormState = {
 
 export const initialState: FormState = { success: false, errors: {}, values: {} };
 
+export type PricingState = {
+  status: "idle" | "saved" | "error";
+  message: string;
+  errors: Record<string, string>; // keyed by input name, e.g. "price:<item id>"
+};
+
+export const initialPricingState: PricingState = { status: "idle", message: "", errors: {} };
+
+export type SendState = {
+  status: "idle" | "sent" | "error";
+  message: string;
+  url: string | null; // the customer link, returned once right after sending
+};
+
+export const initialSendState: SendState = { status: "idle", message: "", url: null };
+
+// Success re-renders the customer page with their answer, so only errors need a message.
+export type RespondState = { message: string | null };
+
+export const initialRespondState: RespondState = { message: null };
+
 export const filmLabels: Record<string, string> = {
   "c2-carbon": "C2 Carbon",
   "pronano-ceramic": "ProNano Ceramic",
 };
 
 export const filmDescriptions: Record<string, string> = {
-  "c2-carbon": "Best value · great heat & UV rejection",
+  "c2-carbon": "Best value · Great heat & UV rejection",
   "pronano-ceramic": "Highest heat rejection",
 };
 
@@ -96,28 +117,6 @@ export type PricingQuote = {
   film_type: string | null;
   items: PricingItem[];
 };
-
-export type PricingState = {
-  status: "idle" | "saved" | "error";
-  message: string;
-  errors: Record<string, string>; // keyed by input name, e.g. "price:<item id>"
-};
-
-export const initialPricingState: PricingState = { status: "idle", message: "", errors: {} };
-
-export type SendState = {
-  status: "idle" | "sent" | "error";
-  message: string;
-  url: string | null; // the customer link, returned once right after sending
-};
-
-export const initialSendState: SendState = { status: "idle", message: "", url: null };
-
-// Success re-renders the customer page with their answer, so only errors need a message.
-export type RespondState = { message: string | null };
-
-export const initialRespondState: RespondState = { message: null };
-
 
 // Fixed time zone so times match the shop's clock, whatever time zone the server is in.
 export const shopDateFormat = new Intl.DateTimeFormat("en-US", {
