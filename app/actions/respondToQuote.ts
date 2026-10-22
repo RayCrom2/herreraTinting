@@ -1,11 +1,8 @@
 "use server";
 import { refresh } from "next/cache";
 import { supabase as admin } from "../lib/supabase/admin";
-import { hashQuoteToken } from "../lib/quoteLinks";
-import type { RespondState } from "../lib/quote";
-
-const TOKEN = /^[A-Za-z0-9_-]{43}$/;
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { hashQuoteToken, TOKEN, UUID } from "../lib/quoteLinks";
+import { type RespondState } from "../lib/quote";
 
 // Public action: anyone can call it, so it trusts nothing from the page but the token.
 export async function respondToQuote(_prevState: RespondState, formData: FormData): Promise<RespondState> {

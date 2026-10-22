@@ -2,10 +2,15 @@
 import { refresh } from "next/cache";
 import { requireStaff } from "../lib/dal";
 import { createQuoteToken, hashQuoteToken, quoteLinkUrl } from "../lib/quoteLinks";
-import type { SendState } from "../lib/quote";
+import { UUID } from "../lib/quoteLinks";
+import { SendState } from "../lib/quote";
 
 export async function resendQuote(requestId: string, _prevState: SendState): Promise<SendState> {
     const { supabase } = await requireStaff();
+
+    if (!UUID.test(requestId)) {
+        return { status: "error", message: "...", url: null };
+    }
 
     const token = createQuoteToken();
 

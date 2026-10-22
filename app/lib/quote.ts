@@ -47,8 +47,7 @@ export const sectionLabels: Record<string, string> = {
   sunroof: "Sunroof",
 };
 
-// createQuoteToken() output: 32 bytes in base64url is always 43 characters.
-export const TOKEN = /^[A-Za-z0-9_-]{43}$/;
+
 
 const sectionOrder = Object.keys(sectionLabels);
 

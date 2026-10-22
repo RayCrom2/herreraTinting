@@ -1,6 +1,10 @@
 import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 
+// createQuoteToken() output: 32 bytes in base64url is always 43 characters.
+export const TOKEN = /^[A-Za-z0-9_-]{43}$/;
+export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 // 32 random bytes = 256 bits: unguessable, and URL-safe in base64url form.
 export function createQuoteToken() {
   return randomBytes(32).toString("base64url");
@@ -21,3 +25,5 @@ export function quoteLinkUrl(token: string) {
   if (!siteUrl) throw new Error("SITE_URL is not set");
   return `${siteUrl.replace(/\/$/, "")}/q/${token}`;
 }
+
+

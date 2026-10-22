@@ -4,7 +4,6 @@ import { startTransition, useActionState, useState } from "react";
 import { initialSendState } from "@/app/lib/quote";
 import { resendQuote } from "@/app/actions/resendQuote";
 import CustomerLink, { type Customer } from "./CustomerLink";
-import { shopDateFormat } from "@/app/lib/quote";
 
 export default function RecreateLink({
   requestId,

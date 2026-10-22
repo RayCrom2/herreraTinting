@@ -9,10 +9,9 @@ import {
   formatMinutes,
   formatMoney,
   sortByFilm,
-  TOKEN,
   formatProperNoun,
 } from "../../lib/quote";
-import { hashQuoteToken, isLinkExpired } from "../../lib/quoteLinks";
+import { hashQuoteToken, isLinkExpired, TOKEN } from "../../lib/quoteLinks";
 import RespondButton from "./RespondButton";
 
 export const metadata: Metadata = {
