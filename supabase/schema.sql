@@ -249,3 +249,55 @@ $$;
 -- Only logged-in staff can send. (Every authenticated user is staff; see claude/memory.md.)
 revoke execute on function public.send_quote(uuid, text) from public, anon;
 grant execute on function public.send_quote(uuid, text) to authenticated;
+
+
+
+-- 9. Called by the staff "Resend quote" action. Revokes previous quote_link and inserts a 
+-- new entry into the table; this allows staff to resend lost or expired quotes.
+create or replace function public.resend_quote(
+  p_request_id  uuid,
+  p_token_hash  text      -- sha256 of the URL token, computed in the server action
+)
+returns uuid              -- the new quote_links.id
+language plpgsql
+security invoker          -- runs as the calling staff member, so their grants and RLS apply
+set search_path = ''
+as $$
+declare
+  v_link_id uuid;
+begin
+  -- "replied_at is not null" ensures that this was a quote that was already sent to the client.
+  perform 1
+  from public.quote_requests
+  where id = p_request_id and replied_at is not null
+  for update;
+
+  if not found then
+    raise exception 'Quote request not found or not sent yet';
+  end if;
+
+  -- As long as the quote wasn't already rejected or accepted, a new link is able to be created
+  if exists (
+    select 1
+    from public.quote_links l
+    where l.quote_request_id = p_request_id
+      and l.status in ('accepted', 'declined')
+  ) then
+    raise exception 'Customer already responded to this quote';
+  end if;
+
+  update public.quote_links l
+    set status = 'revoked'
+    where l.quote_request_id = p_request_id and l.status = 'active';
+  
+  insert into public.quote_links (quote_request_id, token_hash)
+  values (p_request_id, p_token_hash)
+  returning id into v_link_id;
+
+  return v_link_id;
+end;
+$$;
+
+-- Only logged-in staff can send. (Every authenticated user is staff; see claude/memory.md.)
+revoke execute on function public.resend_quote(uuid, text) from public, anon;
+grant execute on function public.resend_quote(uuid, text) to authenticated;

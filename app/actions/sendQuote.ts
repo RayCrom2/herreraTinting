@@ -30,5 +30,5 @@ export async function sendQuote(_prevState: SendState, formData: FormData): Prom
 
   refresh();
   // This is the only time the full link exists; the database keeps just its hash.
-  return { status: "sent", message: "Quote sent. Copy the link and text it to the customer.", url: quoteLinkUrl(token) };
+  return { status: "sent", message: "Quote recorded. Copy the link and text it to the customer.", url: quoteLinkUrl(token) };
 }

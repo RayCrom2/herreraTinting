@@ -21,7 +21,10 @@ export default function RespondButton({
   confirmText: string;
   className: string;
 }) {
-  const [state, formAction, isPending] = useActionState(respondToQuote, initialRespondState);
+  const [state, formAction, isPending] = useActionState(
+    respondToQuote,
+    initialRespondState,
+  );
 
   return (
     <form
