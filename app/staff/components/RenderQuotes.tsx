@@ -10,18 +10,119 @@ import {
   shopDateFormat,
   sectionLabels,
 } from "@/app/lib/quote";
+import { useState } from "react";
 
 export default function RenderQuote({ requests }: { requests: Request[] }) {
+  const filterOptions: string[] = [
+    "all",
+    "open",
+    "sent",
+    // "accepted",
+    // "expired",
+    // "declined",
+  ];
+  const [selectedOption, setSelectedOption] = useState("open");
+  const [isOpen, setIsOpen] = useState<boolean>(false);
+  const [isNonDescendingOrder, setIsNonDescendingOrder] =
+    useState<boolean>(true);
+  const [search, setSearch] = useState("");
+
+  const byStatus =
+    selectedOption === "all"
+      ? requests
+      : requests.filter((r) => {
+          if (selectedOption.toLowerCase() === "open") {
+            return r.replied_at === null;
+          } else if (selectedOption.toLowerCase() === "sent") {
+            return r.replied_at !== null;
+          }
+          return false;
+        });
+
+  // Match the search against name, phone, and vehicle, ignoring case.
+  const query = search.trim().toLowerCase();
+  const filtered = byStatus.filter((r) =>
+    [
+      r.first_name,
+      r.last_name,
+      r.phone,
+      r.vehicle_year,
+      r.vehicle_make,
+      r.vehicle_model,
+    ]
+      .join(" ")
+      .toLowerCase()
+      .includes(query),
+  );
+
+  const displayedQuotes = isNonDescendingOrder
+    ? filtered
+    : filtered.toReversed();
+
   return (
-    <>
+    <div className="grid">
+      <h1 className="text-2xl font-bold">
+        {formatProperNoun(selectedOption)} Quotes
+      </h1>
+      <div className="flex gap-2 pb-2">
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search name, phone, vehicle…"
+          className="mr-auto w-72 rounded border border-zinc-700 bg-transparent px-3 py-2 text-sm placeholder:text-zinc-500 focus:border-zinc-400 focus:outline-none"
+        />
+        <button
+          type="button"
+          onClick={() => setIsNonDescendingOrder((prev) => !prev)}
+          className={`w-26 rounded border px-3 py-2 text-sm ${isNonDescendingOrder ? "border-red-600 bg-red-600 text-white font-bold hover:border-red-500 hover:bg-red-500" : "border-zinc-500 text-zinc-200 hover:border-zinc-300 hover:bg-zinc-800"}`}
+        >
+          {isNonDescendingOrder ? "Ascending" : "Descending"}
+        </button>
+
+        {/* Filter dropdown: shows the current filter, click to pick another */}
+        <div className="relative w-32">
+          <button
+            type="button"
+            onClick={() => setIsOpen(!isOpen)}
+            className="flex w-full items-center justify-between rounded border border-zinc-700 px-3 py-2 text-sm capitalize hover:bg-zinc-800"
+          >
+            {selectedOption}
+            <span className="text-zinc-400">{isOpen ? "▲" : "▼"}</span>
+          </button>
+
+          {isOpen && (
+            <ul className="absolute z-10 mt-1 w-full rounded border border-zinc-700 bg-zinc-900 text-sm">
+              {filterOptions.map((option) => (
+                <li key={option}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedOption(option);
+                      setIsOpen(false);
+                    }}
+                    className={`w-full px-3 py-2 text-left capitalize hover:bg-zinc-800 ${
+                      selectedOption === option ? "text-red-500" : ""
+                    }`}
+                  >
+                    {option}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
       <p className="mt-1 flex gap-4 px-2 text-sm text-zinc-400 pb-2">
-        {requests.length} waiting, oldest first
-        <span className="ml-auto w-36 ...">Date Requested:</span>
+        {displayedQuotes.length} quotes,{" "}
+        {isNonDescendingOrder ? "oldest" : "newest"} first
+        <span className="ml-auto w-36 ...">Date Quoted:</span>
+        <span className="w-36 ...">Date Requested:</span>
         <span className="w-32" /> {/* the button-width spacer */}
       </p>
 
       <ul className="divide-y divide-zinc-800 border-y border-zinc-800">
-        {requests.map((r) => {
+        {displayedQuotes.map((r) => {
           const films = r.quotes.map((q) =>
             q.film_type ? filmLabels[q.film_type] : "Removal only",
           );
@@ -31,7 +132,7 @@ export default function RenderQuote({ requests }: { requests: Request[] }) {
           );
 
           return (
-            <li key={r.id} className="flex items-center gap-4 px-2 py-4">
+            <li key={r.id} className="flex items-center gap-5 px-2 py-4">
               <div className="min-w-0 flex-1">
                 <p>
                   <span className="font-semibold">
@@ -52,19 +153,28 @@ export default function RenderQuote({ requests }: { requests: Request[] }) {
                   {r.removal_request === "not-sure" && " · Removal?"} */}
                 </p>
               </div>
-              <span className="w-36 shrink-0 text-sm text-zinc-400">
+              <span className="w-36 shrink-0 text-sm text-zinc-400 text-center pr-10">
+                {r.replied_at
+                  ? shopDateFormat.format(new Date(r.created_at))
+                  : "-"}
+              </span>
+              <span className="w-36 shrink-0 text-sm text-zinc-400 pl-1">
                 {shopDateFormat.format(new Date(r.created_at))}
               </span>
               <Link
                 href={`/staff/quotes/${r.id}`}
-                className="w-32 shrink-0 text-center rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-500"
+                className={`w-32 shrink-0 text-center rounded-full border-2 px-4 py-2 text-sm font-semibold transition-colors ${
+                  r.replied_at
+                    ? "border-zinc-500 text-zinc-200 hover:border-zinc-300 hover:bg-zinc-800"
+                    : "border-red-600 bg-red-600 text-white hover:border-red-500 hover:bg-red-500"
+                }`}
               >
-                Price quote
+                {r.replied_at ? "View quote" : "Price Quote"}
               </Link>
             </li>
           );
         })}
       </ul>
-    </>
+    </div>
   );
 }

@@ -9,20 +9,24 @@ async function StaffEmail() {
   return <span className="text-zinc-400">{email}</span>;
 }
 
-export default function StaffLayout({ children }: { children: React.ReactNode }) {
+export default function StaffLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <div className="min-h-screen text-zinc-100">
       <header className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
         <div className="flex items-center gap-6">
           <span className="font-semibold">Herrera Tinting · Staff</span>
-          <nav className="flex gap-4 text-sm text-zinc-400">
+          {/* <nav className="flex gap-4 text-sm text-zinc-400">
             <Link href="/staff" className="hover:text-zinc-100">
               Open quotes
             </Link>
             <Link href="/staff/sent" className="hover:text-zinc-100">
               Sent quotes
             </Link>
-          </nav>
+          </nav> */}
         </div>
         <div className="flex items-center gap-4 text-sm">
           <Suspense fallback={null}>
@@ -36,7 +40,9 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
         </div>
       </header>
       <main className="mx-auto max-w-5xl px-4 py-8">
-        <Suspense fallback={<p className="text-zinc-400">Loading...</p>}>{children}</Suspense>
+        <Suspense fallback={<p className="text-zinc-400">Loading...</p>}>
+          {children}
+        </Suspense>
       </main>
     </div>
   );

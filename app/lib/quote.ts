@@ -139,6 +139,7 @@ export type Request = {
  vehicle_make: string,
  vehicle_model: string,
  removal_request: string,
+ replied_at?: string,
  quotes: {
  film_type?: string,
  quote_items: {
