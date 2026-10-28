@@ -23,9 +23,18 @@ const inputClass =
 type ItemInputs = Record<string, { price: string; minutes: string }>;
 
 // Read-only box showing whether the customer asked for this work on a window.
-function WorkCheck({ checked, label }: { checked: boolean; label: string }) {
+// `caption` is shown beside the box on mobile, where the column headers are hidden.
+function WorkCheck({
+  checked,
+  label,
+  caption,
+}: {
+  checked: boolean;
+  label: string;
+  caption: string;
+}) {
   return (
-    <div className="flex justify-center pt-2.5">
+    <div className="flex items-center gap-2 md:justify-center md:pt-2.5">
       <span
         role="img"
         aria-label={`${label}: ${checked ? "yes" : "no"}`}
@@ -34,6 +43,9 @@ function WorkCheck({ checked, label }: { checked: boolean; label: string }) {
         }`}
       >
         {checked && "✓"}
+      </span>
+      <span aria-hidden className="text-sm text-zinc-400 md:hidden">
+        {caption}
       </span>
     </div>
   );
@@ -139,20 +151,21 @@ export default function PricingForm({
                 {quote.film_type ? filmLabels[quote.film_type] : "Removal only"}
               </h2>
 
-              <div className="mt-3 grid grid-cols-[minmax(0,1fr)_4rem_4rem_7rem_5.5rem] items-start gap-x-3 gap-y-3">
-                <span className="text-xs font-semibold uppercase tracking-wide text-zinc-500 pl-2">
+              {/* Mobile: each window is its own stacked block. Desktop: one table-like grid. */}
+              <div className="mt-3 grid grid-cols-1 items-start gap-y-5 md:grid-cols-[minmax(0,1fr)_4rem_4rem_7rem_5.5rem] md:gap-x-3 md:gap-y-3">
+                <span className="hidden text-xs font-semibold uppercase tracking-wide text-zinc-500 pl-2 md:block">
                   Item
                 </span>
-                <span className="text-center text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                <span className="hidden text-center text-xs font-semibold uppercase tracking-wide text-zinc-500 md:block">
                   Install
                 </span>
-                <span className="text-center text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                <span className="hidden text-center text-xs font-semibold uppercase tracking-wide text-zinc-500 md:block">
                   Remove
                 </span>
-                <span className="text-right text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                <span className="hidden text-right text-xs font-semibold uppercase tracking-wide text-zinc-500 md:block">
                   Price ($)
                 </span>
-                <span className="text-right text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                <span className="hidden text-right text-xs font-semibold uppercase tracking-wide text-zinc-500 md:block">
                   Minutes
                 </span>
 
@@ -163,8 +176,11 @@ export default function PricingForm({
                   const minutesError = state.errors[minutesName];
 
                   return (
-                    <div key={item.id} className="contents">
-                      <div className="min-w-0 pt-2">
+                    <div
+                      key={item.id}
+                      className="grid grid-cols-2 gap-x-3 gap-y-2 md:contents"
+                    >
+                      <div className="col-span-2 min-w-0 md:col-span-1 md:pt-2">
                         <p className="font-medium">
                           {sectionLabels[item.section]}
                         </p>
@@ -172,12 +188,20 @@ export default function PricingForm({
                       <WorkCheck
                         checked={item.install}
                         label={`${sectionLabels[item.section]} install`}
+                        caption="Install"
                       />
                       <WorkCheck
                         checked={item.removal}
                         label={`${sectionLabels[item.section]} removal`}
+                        caption="Remove"
                       />
                       <div>
+                        <span
+                          aria-hidden
+                          className="mb-1 block text-xs text-zinc-500 md:hidden"
+                        >
+                          Price ($)
+                        </span>
                         <input
                           name={priceName}
                           inputMode="decimal"
@@ -196,6 +220,12 @@ export default function PricingForm({
                         )}
                       </div>
                       <div>
+                        <span
+                          aria-hidden
+                          className="mb-1 block text-xs text-zinc-500 md:hidden"
+                        >
+                          Minutes
+                        </span>
                         <input
                           name={minutesName}
                           inputMode="numeric"
@@ -240,7 +270,7 @@ export default function PricingForm({
             <button
               type="submit"
               disabled={isPending || isSending}
-              className="rounded-full bg-red-600 px-6 py-3 font-bold text-white transition-colors hover:bg-red-500 disabled:opacity-60"
+              className="w-full rounded-full bg-red-600 px-6 py-3 md:w-auto font-bold text-white transition-colors hover:bg-red-500 disabled:opacity-60"
             >
               {isPending ? "Saving..." : "Save prices"}
             </button>
@@ -250,7 +280,7 @@ export default function PricingForm({
               disabled={
                 !fullyPriced || hasUnsavedChanges || isPending || isSending
               }
-              className="rounded-full border border-zinc-500 px-6 py-3 font-bold text-zinc-100 transition-colors hover:border-zinc-300 disabled:opacity-40"
+              className="w-full rounded-full border border-zinc-500 px-6 py-3 md:w-auto font-bold text-zinc-100 transition-colors hover:border-zinc-300 disabled:opacity-40"
             >
               {isSending ? "Sending..." : "Send quote"}
             </button>

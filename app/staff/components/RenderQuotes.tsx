@@ -64,13 +64,13 @@ export default function RenderQuote({ requests }: { requests: Request[] }) {
       <h1 className="text-2xl font-bold">
         {formatProperNoun(selectedOption)} Quotes
       </h1>
-      <div className="flex gap-2 pb-2">
+      <div className="flex flex-wrap gap-2 pb-2">
         <input
           type="search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search name, phone, vehicle…"
-          className="mr-auto w-72 rounded border border-zinc-700 bg-transparent px-3 py-2 text-sm placeholder:text-zinc-500 focus:border-zinc-400 focus:outline-none"
+          className="w-full md:mr-auto md:w-72 rounded border border-zinc-700 bg-transparent px-3 py-2 text-sm placeholder:text-zinc-500 focus:border-zinc-400 focus:outline-none"
         />
         <button
           type="button"
@@ -116,9 +116,10 @@ export default function RenderQuote({ requests }: { requests: Request[] }) {
       <p className="mt-1 flex gap-4 px-2 text-sm text-zinc-400 pb-2">
         {displayedQuotes.length} quotes,{" "}
         {isNonDescendingOrder ? "oldest" : "newest"} first
-        <span className="ml-auto w-36 ...">Date Quoted:</span>
-        <span className="w-36 ...">Date Requested:</span>
-        <span className="w-32" /> {/* the button-width spacer */}
+        {/* Column labels only make sense when the dates are columns (desktop) */}
+        <span className="ml-auto hidden w-36 md:block">Date Quoted:</span>
+        <span className="hidden w-36 md:block">Date Requested:</span>
+        <span className="hidden w-32 md:block" /> {/* the button-width spacer */}
       </p>
 
       <ul className="divide-y divide-zinc-800 border-y border-zinc-800">
@@ -132,8 +133,11 @@ export default function RenderQuote({ requests }: { requests: Request[] }) {
           );
 
           return (
-            <li key={r.id} className="flex items-center gap-5 px-2 py-4">
-              <div className="min-w-0 flex-1">
+            <li
+              key={r.id}
+              className="flex flex-wrap items-center gap-x-5 gap-y-3 px-2 py-4 md:flex-nowrap"
+            >
+              <div className="min-w-0 basis-full md:basis-auto md:flex-1">
                 <p>
                   <span className="font-semibold">
                     {r.first_name} {r.last_name}
@@ -152,18 +156,24 @@ export default function RenderQuote({ requests }: { requests: Request[] }) {
                   {/* {r.removal_request === "yes" && " · Removal"}
                   {r.removal_request === "not-sure" && " · Removal?"} */}
                 </p>
+                {/* On mobile the date columns are hidden, so show them inline */}
+                <p className="mt-1 text-xs text-zinc-500 md:hidden">
+                  Requested {shopDateFormat.format(new Date(r.created_at))}
+                  {r.replied_at &&
+                    ` · Quoted ${shopDateFormat.format(new Date(r.created_at))}`}
+                </p>
               </div>
-              <span className="w-36 shrink-0 text-sm text-zinc-400 text-center pr-10">
+              <span className="hidden w-36 shrink-0 text-sm text-zinc-400 text-center pr-10 md:block">
                 {r.replied_at
                   ? shopDateFormat.format(new Date(r.created_at))
                   : "-"}
               </span>
-              <span className="w-36 shrink-0 text-sm text-zinc-400 pl-1">
+              <span className="hidden w-36 shrink-0 text-sm text-zinc-400 pl-1 md:block">
                 {shopDateFormat.format(new Date(r.created_at))}
               </span>
               <Link
                 href={`/staff/quotes/${r.id}`}
-                className={`w-32 shrink-0 text-center rounded-full border-2 px-4 py-2 text-sm font-semibold transition-colors ${
+                className={`w-full md:w-32 shrink-0 text-center rounded-full border-2 px-4 py-2 text-sm font-semibold transition-colors ${
                   r.replied_at
                     ? "border-zinc-500 text-zinc-200 hover:border-zinc-300 hover:bg-zinc-800"
                     : "border-red-600 bg-red-600 text-white hover:border-red-500 hover:bg-red-500"
