@@ -1,3 +1,6 @@
+import { Timestamp } from "next/dist/server/lib/cache-handlers/types";
+import { UUID } from "./quoteLinks";
+
 export type FormState = {
   success: boolean;
   errors: Record<string, string>;
@@ -125,3 +128,21 @@ export const shopDateFormat = new Intl.DateTimeFormat("en-US", {
   hour: "numeric",
   minute: "2-digit",
 });
+
+export type Request = {
+ id: string,
+ created_at: string,
+ first_name: string,
+ last_name: string,
+ phone: string,
+ vehicle_year: string,
+ vehicle_make: string,
+ vehicle_model: string,
+ removal_request: string,
+ quotes: {
+ film_type?: string,
+ quote_items: {
+ section: string,
+ }[],
+ }[],
+};
