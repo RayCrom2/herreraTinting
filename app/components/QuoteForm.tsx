@@ -229,7 +229,7 @@ export default function QuoteForm() {
 
   return (
     <form action={formAction} noValidate className="space-y-6 text-zinc-100">
-      <div className="grid gap-6 sm:grid-cols-2">
+      <div className="grid grid-cols-2 gap-3 sm:gap-6">
         <div>
           <label htmlFor="firstName" className={labelClass}>
             First Name <span className="text-red-500">*</span>
@@ -275,8 +275,9 @@ export default function QuoteForm() {
         <FieldError message={errors.phone} />
       </div>
 
-      <div className="grid gap-6 sm:grid-cols-3">
-        <div>
+      {/* Mobile: Year on its own row, Make & Model side by side. */}
+      <div className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 sm:gap-x-6">
+        <div className="col-span-2 sm:col-span-1">
           <label htmlFor="vehicleYear" className={labelClass}>
             Vehicle Year <span className="text-red-500">*</span>
           </label>
@@ -356,7 +357,7 @@ export default function QuoteForm() {
       <fieldset>
         <legend className={labelClass}>
           Which Windows Need Tint?{" "}
-          <span className="text-xs font-normal text-zinc-400">
+          <span className="mt-0.5 block text-xs font-normal text-zinc-400 sm:mt-0 sm:inline">
             Pick all that apply. Red = tinted.
           </span>
         </legend>
@@ -368,17 +369,17 @@ export default function QuoteForm() {
       <fieldset className="group">
         <legend className={labelClass}>
           Which Windows Need Old Tint Removed?{" "}
-          <span className="text-xs font-normal text-zinc-400">
+          <span className="mt-0.5 block text-xs font-normal text-zinc-400 sm:mt-0 sm:inline">
             Pick all that apply, or leave blank if none.
           </span>
         </legend>
         <WindowPicker name="removalWindows" selected={values.removalWindows} />
-        <label className="mt-3 flex items-center gap-3 text-sm text-zinc-300 group-has-[input[name=removalWindows]:checked]:hidden">
+        <label className="mt-3 flex items-center gap-3 py-1 text-sm text-zinc-300 group-has-[input[name=removalWindows]:checked]:hidden">
           <input
             type="checkbox"
             name="removalNotSure"
             defaultChecked={values.removalNotSure === "on"}
-            className="size-4 shrink-0 accent-red-500"
+            className="size-5 shrink-0 accent-red-500 sm:size-4"
           />
           <span>Not sure if I have old tint</span>
         </label>
@@ -406,7 +407,7 @@ export default function QuoteForm() {
             type="checkbox"
             name="terms"
             defaultChecked={values.terms === "on"}
-            className="mt-1 size-4 shrink-0 accent-red-500"
+            className="mt-0.5 size-5 shrink-0 accent-red-500 sm:mt-1 sm:size-4"
           />
           <span>
             I agree to the terms &amp; conditions provided by the company. By

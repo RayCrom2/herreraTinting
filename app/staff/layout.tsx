@@ -6,7 +6,7 @@ import { logout } from "../actions/auth";
 // Reads the session, so it streams in at request time inside <Suspense>.
 async function StaffEmail() {
   const { email } = await requireStaff();
-  return <span className="text-zinc-400">{email}</span>;
+  return <span className="hidden text-zinc-400 md:inline">{email}</span>;
 }
 
 export default function StaffLayout({
@@ -18,7 +18,9 @@ export default function StaffLayout({
     <div className="min-h-screen text-zinc-100">
       <header className="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
         <div className="flex items-center gap-6">
-          <span className="font-semibold">Herrera Tinting · Staff</span>
+          <Link href="/staff" className="font-semibold hover:text-red-400">
+            Herrera Tinting · Staff
+          </Link>
           {/* <nav className="flex gap-4 text-sm text-zinc-400">
             <Link href="/staff" className="hover:text-zinc-100">
               Open quotes
