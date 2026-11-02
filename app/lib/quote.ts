@@ -135,13 +135,14 @@ export type Request = {
  first_name: string,
  last_name: string,
  phone: string,
+ vehicle_type: string | null,
  vehicle_year: string,
  vehicle_make: string,
  vehicle_model: string,
  removal_request: string,
  replied_at?: string,
  quotes: {
- film_type?: string,
+ film_type: string | null,
  quote_items: {
  section: string,
  }[],

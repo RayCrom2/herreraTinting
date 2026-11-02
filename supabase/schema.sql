@@ -138,9 +138,10 @@ begin
   values (p_first_name, p_last_name, p_phone, p_vehicle_type, p_vehicle_year, p_vehicle_make, p_vehicle_model, p_removal_request, p_old_tint_condition, p_source, p_comment)
   returning id into v_request_id;
 
-  v_films := case when p_film = 'both'
-                  then array['c2-carbon', 'pronano-ceramic']
-                  else array[p_film] end;
+  v_films := case when p_film is null then array[null::text]   -- removal only
+             when p_film = 'both' then array['c2-carbon', 'pronano-ceramic']
+             else array[p_film] end;
+
 
   foreach v_film in array v_films loop
     insert into public.quotes (quote_request_id, film_type)

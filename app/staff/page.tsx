@@ -31,7 +31,7 @@ async function OpenQuotesList() {
     .from("quote_requests")
     .select(
       `
-      id, created_at, first_name, last_name, phone,
+      id, created_at, first_name, last_name, phone, vehicle_type,
       vehicle_year, vehicle_make, vehicle_model, removal_request, replied_at,
       quotes ( film_type, quote_items ( section ) )
     `,
