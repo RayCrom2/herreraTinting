@@ -22,6 +22,29 @@ const filmOptions = [
   },
 ];
 
+const vehicleTypes = [
+  {
+    value: "coupe",
+    label: "Coupe",
+  },
+  {
+    value: "sedan",
+    label: "Sedan",
+  },
+  {
+    value: "suv",
+    label: "SUV",
+  },
+  {
+    value: "suv",
+    label: "Truck",
+  },
+  {
+    value: "other",
+    label: "Not sure",
+  },
+];
+
 // Car diagram segments, viewed from above with the front of the car on the right.
 type Segment =
   | "back"
@@ -171,7 +194,13 @@ function CarDiagram({ tinted }: { tinted: Segment[] | null }) {
 }
 
 // One card per window area. Used for both "needs tint" and "needs removal".
-function WindowPicker({ name, selected }: { name: string; selected?: string | string[] }) {
+function WindowPicker({
+  name,
+  selected,
+}: {
+  name: string;
+  selected?: string | string[];
+}) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       {windowOptions.map((option) => (
@@ -180,7 +209,9 @@ function WindowPicker({ name, selected }: { name: string; selected?: string | st
             type="checkbox"
             name={name}
             value={option.value}
-            defaultChecked={Array.isArray(selected) && selected.includes(option.value)}
+            defaultChecked={
+              Array.isArray(selected) && selected.includes(option.value)
+            }
             className="sr-only"
           />
           <CarDiagram tinted={option.tinted} />
@@ -204,8 +235,6 @@ const inputClass =
   "w-full rounded-xl border border-zinc-800 bg-black px-4 py-3.5 text-zinc-100 placeholder:text-zinc-500 focus:border-red-500 focus:outline-none";
 const optionCardClass =
   "flex h-full cursor-pointer flex-col rounded-xl border border-zinc-800 bg-zinc-950 p-3 transition-colors hover:border-zinc-600 has-[:checked]:border-red-500 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-red-500";
-
-
 
 export default function QuoteForm() {
   const [state, formAction, isPending] = useActionState(
@@ -275,9 +304,35 @@ export default function QuoteForm() {
         <FieldError message={errors.phone} />
       </div>
 
-      {/* Mobile: Year on its own row, Make & Model side by side. */}
-      <div className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 sm:gap-x-6">
-        <div className="col-span-2 sm:col-span-1">
+      {/* Mobile: Type & Year side by side, then Make & Model. */}
+      <div className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-4 sm:gap-x-6">
+        <div>
+          <label htmlFor="vehicleType" className={labelClass}>
+            Vehicle Type <span className="text-red-500">*</span>
+          </label>
+          <select
+            id="vehicleType"
+            name="vehicleType"
+            defaultValue={values.vehicleType ?? ""}
+            className={`${inputClass} invalid:text-zinc-500`}
+            required
+          >
+            <option value="" disabled>
+              Select
+            </option>
+            {vehicleTypes.map((option) => (
+              <option
+                key={option.label}
+                value={option.value}
+                className="text-zinc-100"
+              >
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <FieldError message={errors.vehicleType} />
+        </div>
+        <div>
           <label htmlFor="vehicleYear" className={labelClass}>
             Vehicle Year <span className="text-red-500">*</span>
           </label>
