@@ -18,12 +18,15 @@ create table quote_requests (
   last_name       text check (char_length(last_name) <= 100),   -- nullable for Instagram/phone leads
   phone           text check (phone ~ '^\d{10}$'),              -- 10 US digits, normalized by submitQuote
 
+  vehicle_type    text check (vehicle_type in ('coupe', 'sedan', 'suv', 'truck')),
   vehicle_year    int  check (vehicle_year between 1800 and 2100),
   vehicle_make    text check (char_length(vehicle_make) <= 50),
   vehicle_model   text check (char_length(vehicle_model) <= 50),
 
   -- The customer's answer for the whole car. Staff set removal per window on quote_items.
   removal_request text check (removal_request in ('no', 'yes', 'not-sure')),
+  old_tint_condition text check (old_tint_condition in ('peeling', 'bubbly', 'faded', 'blurry_hazy', 'discoloration', 'none', 'other')),
+
 
   source          text not null
                   check (source in ('website', 'instagram', 'phone', 'text', 'other')),
@@ -69,9 +72,12 @@ create table quote_items (
 
   install           boolean not null default true,    -- put new tint on this area
   removal           boolean not null default false,   -- take old tint off; window was in customer's removal list
-  price_cents       int check (price_cents >= 0),     -- null until staff price it
+  removal_price_cents int,
+  install_price_cents int,     -- null until staff price it
   duration_minutes  int check (duration_minutes > 0), -- null until staff set it
 
+  check (install_price_cents >= 0 and install),
+  check (removal_price_cents >= 0 and removal),
   check (install or removal),                         -- a row must do something
   unique (quote_id, section)                          -- each window area appears once per quote
 );
@@ -85,6 +91,7 @@ grant select, insert, update, delete on public.quote_requests to service_role;
 grant select, insert, update, delete on public.quotes         to service_role;
 grant select, insert, update, delete on public.quote_items    to service_role;
 
+drop function if exists public.submit_quote_request(text, text, text, int, text, text, text, text, text[], text, text[], text);
 -- 5. Called by app/actions/submitQuote.ts. Creates the request, one quote per film,
 --    and one item per window in a single transaction; any failure rolls back all of it.
 create or replace function public.submit_quote_request(
@@ -92,6 +99,7 @@ create or replace function public.submit_quote_request(
   p_first_name     text,
   p_last_name      text,
   p_phone          text,     -- already normalized to 10 digits in submitQuote
+  p_vehicle_type   text,
   p_vehicle_year   int,
   p_vehicle_make   text,
   p_vehicle_model  text,
@@ -100,6 +108,7 @@ create or replace function public.submit_quote_request(
   p_windows        text[],   -- e.g. {'front-sides','sunroof'}
   p_removal_request text,     -- 'yes' | 'no' | 'not-sure'
   p_removal_windows text[],   -- e.g. {'front-sides','sunroof'}
+  p_old_tint_condition text,
   p_comment        text default null   -- optional, so it goes last
 )
 returns uuid                    -- the new quote_requests.id
@@ -117,8 +126,8 @@ begin
     raise exception 'At least one window is required';
   end if;
 
-  insert into public.quote_requests (first_name, last_name, phone, vehicle_year, vehicle_make, vehicle_model, removal_request, source, comment)
-  values (p_first_name, p_last_name, p_phone, p_vehicle_year, p_vehicle_make, p_vehicle_model, p_removal_request, p_source, p_comment)
+  insert into public.quote_requests (first_name, last_name, phone, vehicle_type, vehicle_year, vehicle_make, vehicle_model, removal_request, old_tint_condition, source, comment)
+  values (p_first_name, p_last_name, p_phone, p_vehicle_type, p_vehicle_year, p_vehicle_make, p_vehicle_model, p_removal_request, p_old_tint_condition, p_source, p_comment)
   returning id into v_request_id;
 
   v_films := case when p_film = 'both'
@@ -142,9 +151,9 @@ end;
 $$;
 
 -- Only server code should call it
-revoke execute on function public.submit_quote_request(text, text, text, int, text, text, text, text, text[], text, text[], text)
+revoke execute on function public.submit_quote_request(text, text, text, text, int, text, text, text, text, text[], text, text[], text, text)
   from public, anon, authenticated;
-grant execute on function public.submit_quote_request(text, text, text, int, text, text, text, text, text[], text, text[], text)
+grant execute on function public.submit_quote_request(text, text, text, text, int, text, text, text, text, text[], text, text[], text, text)
   to service_role;
 
 -- 6. Staff access: logged-in staff (the authenticated role) via app/lib/dal.ts.
@@ -233,7 +242,9 @@ begin
     from public.quote_items i
     join public.quotes q on q.id = i.quote_id
     where q.quote_request_id = p_request_id
-      and (i.price_cents is null or i.duration_minutes is null)
+      and ((i.install and i.install_price_cents is null)
+      or (i.removal and i.removal_price_cents is null)
+      or i.duration_minutes is null)
   ) then
     raise exception 'Every window needs a price and time before sending';
   end if;
