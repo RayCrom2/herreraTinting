@@ -20,6 +20,11 @@ const filmOptions = [
     label: "Quote for Both",
     description: "Compare prices side by side",
   },
+  {
+    value: "removal-only",
+    label: "Removal Only",
+    description: "",
+  }
 ];
 
 const vehicleTypes = [
@@ -45,6 +50,37 @@ const vehicleTypes = [
   },
 ];
 
+const conditionsOfOldTint = [
+  {
+    value: "peeling",
+    label: "Peeling",
+  },
+  {
+    value: "bubbly",
+    label: "Bubbly",
+  },
+  {
+    value: "faded",
+    label: "Faded",
+  },
+  {
+    value: "blurry_hazy",
+    label: "Blurry/Hazy",
+  },
+  {
+    value: "discolored",
+    label: "Discolored",
+  },
+  {
+    value: "fine",
+    label: "Looks fine",
+  },
+  {
+    value: "other",
+    label: "Other",
+  },
+]
+
 // Car diagram segments, viewed from above with the front of the car on the right.
 type Segment =
   | "back"
@@ -60,43 +96,43 @@ const windowOptions: {
   description: string;
   tinted: Segment[] | null;
 }[] = [
-  {
-    value: "windshield",
-    label: "Full Front Windshield",
-    description: "Entire windshield",
-    tinted: ["windshield"],
-  },
-  {
-    value: "sunstrip",
-    label: "Sunstrip",
-    description: "Top strip of windshield",
-    tinted: ["strip"],
-  },
-  {
-    value: "front-sides",
-    label: "Front Driver & Passenger",
-    description: "Front door windows",
-    tinted: ["frontSides"],
-  },
-  {
-    value: "rear-sides",
-    label: "Rear Passenger Side Windows",
-    description: "Rear door + quarter windows",
-    tinted: ["rearSides"],
-  },
-  {
-    value: "rear-windshield",
-    label: "Rear Windshield",
-    description: "Back glass",
-    tinted: ["back"],
-  },
-  {
-    value: "sunroof",
-    label: "Sunroof",
-    description: "Sunroof or moonroof glass",
-    tinted: ["sunroof"],
-  },
-];
+    {
+      value: "windshield",
+      label: "Full Front Windshield",
+      description: "Entire windshield",
+      tinted: ["windshield"],
+    },
+    {
+      value: "sunstrip",
+      label: "Sunstrip",
+      description: "Top strip of windshield",
+      tinted: ["strip"],
+    },
+    {
+      value: "front-sides",
+      label: "Front Driver & Passenger",
+      description: "Front door windows",
+      tinted: ["frontSides"],
+    },
+    {
+      value: "rear-sides",
+      label: "Rear Passenger Side Windows",
+      description: "Rear door + quarter windows",
+      tinted: ["rearSides"],
+    },
+    {
+      value: "rear-windshield",
+      label: "Rear Windshield",
+      description: "Back glass",
+      tinted: ["back"],
+    },
+    {
+      value: "sunroof",
+      label: "Sunroof",
+      description: "Sunroof or moonroof glass",
+      tinted: ["sunroof"],
+    },
+  ];
 
 function CarDiagram({ tinted }: { tinted: Segment[] | null }) {
   const fill = (segment: Segment) =>
@@ -310,26 +346,40 @@ export default function QuoteForm() {
           <label htmlFor="vehicleType" className={labelClass}>
             Vehicle Type <span className="text-red-500">*</span>
           </label>
-          <select
-            id="vehicleType"
-            name="vehicleType"
-            defaultValue={values.vehicleType ?? ""}
-            className={`${inputClass} invalid:text-zinc-500`}
-            required
-          >
-            <option value="" disabled>
-              Select
-            </option>
-            {vehicleTypes.map((option) => (
-              <option
-                key={option.label}
-                value={option.value}
-                className="text-zinc-100"
-              >
-                {option.label}
+          <div className="relative">
+            <select
+              id="vehicleType"
+              name="vehicleType"
+              defaultValue={values.vehicleType ?? ""}
+              className={`${inputClass} appearance-none pr-10 invalid:text-zinc-500`}
+              required
+            >
+              <option value="" disabled>
+                Select
               </option>
-            ))}
-          </select>
+              {vehicleTypes.map((option) => (
+                <option
+                  key={option.label}
+                  value={option.value}
+                  className="text-zinc-100"
+                >
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400"
+            >
+              <path
+                fillRule="evenodd"
+                d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </div>
           <FieldError message={errors.vehicleType} />
         </div>
         <div>
@@ -355,7 +405,7 @@ export default function QuoteForm() {
             id="vehicleMake"
             name="vehicleMake"
             type="text"
-            placeholder="e.g. Mercedes-AMG"
+            placeholder="e.g. Honda"
             defaultValue={values.vehicleMake}
             className={inputClass}
           />
@@ -369,7 +419,7 @@ export default function QuoteForm() {
             id="vehicleModel"
             name="vehicleModel"
             type="text"
-            placeholder="e.g. C63"
+            placeholder="e.g. Accord"
             defaultValue={values.vehicleModel}
             className={inputClass}
           />
@@ -380,7 +430,7 @@ export default function QuoteForm() {
       <fieldset>
         <legend className={`${labelClass} flex items-center gap-3`}>
           <span>
-            What Type of Film <span className="text-red-500">*</span>
+            What Type of Film
           </span>
           <a
             href="#compare-films"
@@ -420,26 +470,68 @@ export default function QuoteForm() {
         <FieldError message={errors.windows} />
       </fieldset>
 
-      {/* group: the "Not sure" box hides itself once any removal window is checked. */}
-      <fieldset className="group">
-        <legend className={labelClass}>
-          Which Windows Need Old Tint Removed?{" "}
-          <span className="mt-0.5 block text-xs font-normal text-zinc-400 sm:mt-0 sm:inline">
-            Pick all that apply, or leave blank if none.
-          </span>
-        </legend>
-        <WindowPicker name="removalWindows" selected={values.removalWindows} />
-        <label className="mt-3 flex items-center gap-3 py-1 text-sm text-zinc-300 group-has-[input[name=removalWindows]:checked]:hidden">
-          <input
-            type="checkbox"
-            name="removalNotSure"
-            defaultChecked={values.removalNotSure === "on"}
-            className="size-5 shrink-0 accent-red-500 sm:size-4"
+      {/* group/removal: blocks after the fieldset react to removal windows being checked. */}
+      <div className="group/removal space-y-6">
+        {/* group: the "Not sure" box hides itself once any removal window is checked. */}
+        <fieldset className="group">
+          <legend className={labelClass}>
+            Which Windows Need Old Tint Removed?{" "}
+            <span className="mt-0.5 block text-xs font-normal text-zinc-400 sm:mt-0 sm:inline">
+              Pick all that apply, or leave blank if none.
+            </span>
+          </legend>
+          <WindowPicker name="removalWindows" selected={values.removalWindows} />
+          <label className="mt-3 flex items-center gap-3 py-1 text-sm text-zinc-300 group-has-[input[name=removalWindows]:checked]:hidden">
+            <input
+              type="checkbox"
+              name="removalNotSure"
+              defaultChecked={values.removalNotSure === "on"}
+              className="size-5 shrink-0 accent-red-500 sm:size-4"
+            />
+            <span>Not sure if I have old tint</span>
+          </label>
+          <FieldError message={errors.removalWindows} />
+        </fieldset>
+
+
+        <div className="relative hidden group-has-[input[name=removalWindows]:checked]/removal:block">
+        <label htmlFor="oldTintCondition" className={labelClass}>Old Tint Condition <span className="text-red-500">*</span></label>
+          <select
+          id="oldTintCondition"
+          name="oldTintCondition"
+          defaultValue={values.oldTintCondition ?? ""}
+          className={`${inputClass} appearance-none pr-10 invalid:text-zinc-500`}
+          required>
+          <option value="" disabled>
+            Select
+          </option>
+          {conditionsOfOldTint.map((condition) => {
+            return (
+            <option 
+            key={condition.value} 
+            value={condition.value}
+            className="text-zinc-100">
+              {condition.label}
+            </option>)
+          })}
+        </select>
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+          className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400"
+        >
+          <path
+            fillRule="evenodd"
+            d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+            clipRule="evenodd"
           />
-          <span>Not sure if I have old tint</span>
-        </label>
-        <FieldError message={errors.removalWindows} />
-      </fieldset>
+        </svg>
+          </div>
+        <FieldError message={errors.oldTintCondition} />
+
+      </div>
+
 
       <div>
         <label htmlFor="comment" className={labelClass}>

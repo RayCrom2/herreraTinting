@@ -1,4 +1,4 @@
-import QuoteForm from "./components/quoteForm";
+import QuoteForm from "./components/QuoteForm";
 
 export default function Home() {
   return (

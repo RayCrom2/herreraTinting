@@ -25,7 +25,7 @@ create table quote_requests (
 
   -- The customer's answer for the whole car. Staff set removal per window on quote_items.
   removal_request text check (removal_request in ('no', 'yes', 'not-sure')),
-  old_tint_condition text check (old_tint_condition in ('peeling', 'bubbly', 'faded', 'blurry_hazy', 'discoloration', 'none', 'other')),
+  old_tint_condition text check (old_tint_condition in ('peeling', 'bubbly', 'faded', 'blurry_hazy', 'discolored', 'fine', 'other')),
 
 
   source          text not null
@@ -76,8 +76,8 @@ create table quote_items (
   install_price_cents int,     -- null until staff price it
   duration_minutes  int check (duration_minutes > 0), -- null until staff set it
 
-  check (install_price_cents >= 0 and install),
-  check (removal_price_cents >= 0 and removal),
+  check ((install and install_price_cents >= 0) or install_price_cents is null),
+  check ((removal and removal_price_cents >= 0) or removal_price_cents is null),
   check (install or removal),                         -- a row must do something
   unique (quote_id, section)                          -- each window area appears once per quote
 );
