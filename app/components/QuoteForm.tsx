@@ -20,11 +20,6 @@ const filmOptions = [
     label: "Quote for Both",
     description: "Compare prices side by side",
   },
-  {
-    value: "removal-only",
-    label: "Removal Only",
-    description: "",
-  }
 ];
 
 const vehicleTypes = [
@@ -41,7 +36,7 @@ const vehicleTypes = [
     label: "SUV",
   },
   {
-    value: "suv",
+    value: "truck",
     label: "Truck",
   },
   {
@@ -347,7 +342,9 @@ export default function QuoteForm() {
             Vehicle Type <span className="text-red-500">*</span>
           </label>
           <div className="relative">
+            {/* key remounts the select so a failed submit keeps the choice; React only reads a select's defaultValue on mount. */}
             <select
+              key={String(values.vehicleType ?? "")}
               id="vehicleType"
               name="vehicleType"
               defaultValue={values.vehicleType ?? ""}
@@ -456,6 +453,26 @@ export default function QuoteForm() {
             </label>
           ))}
         </div>
+
+        {/* Not a film, so it sits apart: same radio group, quieter card. */}
+        <div className="my-3 flex items-center gap-3 text-xs text-zinc-500">
+          <span className="h-px flex-1 bg-zinc-800" />
+          or
+          <span className="h-px flex-1 bg-zinc-800" />
+        </div>
+        <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-dashed border-zinc-500 px-4 py-3 transition-colors hover:border-zinc-600 has-[:checked]:border-solid has-[:checked]:border-red-500 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-red-500">
+          <input
+            type="radio"
+            name="film"
+            value="removal-only"
+            defaultChecked={values.film === "removal-only"}
+            className="sr-only"
+          />
+          <span className="text-sm font-semibold">Removal Only</span>
+          <span className="text-xs text-zinc-400">
+            Just take the old tint off
+          </span>
+        </label>
         <FieldError message={errors.film} />
       </fieldset>
 
@@ -497,6 +514,7 @@ export default function QuoteForm() {
         <div className="relative hidden group-has-[input[name=removalWindows]:checked]/removal:block">
         <label htmlFor="oldTintCondition" className={labelClass}>Old Tint Condition <span className="text-red-500">*</span></label>
           <select
+          key={String(values.oldTintCondition ?? "")}
           id="oldTintCondition"
           name="oldTintCondition"
           defaultValue={values.oldTintCondition ?? ""}

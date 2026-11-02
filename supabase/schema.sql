@@ -33,7 +33,8 @@ create table quote_requests (
 
   comment         text check (char_length(comment) <= 500),
 
-  replied_at      timestamptz                   -- null until staff send the quote(s); lock quotes once set
+  replied_at      timestamptz,                   -- null until staff send the quote(s); lock quotes once set
+  check (old_tint_condition is null or removal_request = 'yes')
 );
 
 -- 2. A priced option under a request: one per film ('both' on the form creates two)
@@ -104,7 +105,7 @@ create or replace function public.submit_quote_request(
   p_vehicle_make   text,
   p_vehicle_model  text,
   p_source         text,
-  p_film           text,     -- 'c2-carbon' | 'pronano-ceramic' | 'both'
+  p_film           text,     -- 'c2-carbon' | 'pronano-ceramic' | 'both' | 'null' (removal only)
   p_windows        text[],   -- e.g. {'front-sides','sunroof'}
   p_removal_request text,     -- 'yes' | 'no' | 'not-sure'
   p_removal_windows text[],   -- e.g. {'front-sides','sunroof'}
@@ -122,9 +123,16 @@ declare
   v_films       text[];         -- 'both' expands to two films
   v_film        text;
 begin
-  if coalesce(cardinality(p_windows), 0) = 0 then
-    raise exception 'At least one window is required';
+    -- Removal Only (no film) has nothing to install; a film needs windows to install on.
+  if (p_film is null) <> (coalesce(cardinality(p_windows), 0) = 0) then
+    raise exception 'Film and tint windows do not match';
   end if;
+  if coalesce(cardinality(p_windows), 0) = 0
+    and coalesce(cardinality(p_removal_windows), 0) = 0 then
+    raise exception 'At least one window to tint or remove is required';
+  end if;
+
+
 
   insert into public.quote_requests (first_name, last_name, phone, vehicle_type, vehicle_year, vehicle_make, vehicle_model, removal_request, old_tint_condition, source, comment)
   values (p_first_name, p_last_name, p_phone, p_vehicle_type, p_vehicle_year, p_vehicle_make, p_vehicle_model, p_removal_request, p_old_tint_condition, p_source, p_comment)
