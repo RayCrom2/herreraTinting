@@ -110,7 +110,8 @@ export type PricingItem = {
   section: string;
   install: boolean;
   removal: boolean;
-  price_cents: number | null;
+  install_price_cents: number | null;
+  removal_price_cents: number | null;
   duration_minutes: number | null;
 };
 
@@ -148,3 +149,26 @@ export type Request = {
  }[],
  }[],
 };
+
+export const vehicleTypes = [
+  {
+    value: "coupe",
+    label: "Coupe",
+  },
+  {
+    value: "sedan",
+    label: "Sedan",
+  },
+  {
+    value: "suv",
+    label: "SUV",
+  },
+  {
+    value: "truck",
+    label: "Truck",
+  },
+  {
+    value: "other",
+    label: "Not sure",
+  },
+];

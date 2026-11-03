@@ -321,3 +321,24 @@ $$;
 -- Only logged-in staff can send. (Every authenticated user is staff; see claude/memory.md.)
 revoke execute on function public.resend_quote(uuid, text) from public, anon;
 grant execute on function public.resend_quote(uuid, text) to authenticated;
+
+-- 10. Default install prices staff start from when pricing a quote. One row per vehicle type, film and window.
+--     Removal isn't here: it varies too much, so staff price it by hand.
+create table prices (
+  vehicle_type      text not null check (vehicle_type in ('coupe', 'sedan', 'suv', 'truck')),
+  film_type         text not null check (film_type in ('c2-carbon', 'pronano-ceramic')),
+  section           text not null check (section in (
+                      'windshield', 'sunstrip', 'front-sides',
+                      'rear-sides', 'rear-windshield', 'sunroof'
+                    )),
+
+  install_price_cents       int not null check (install_price_cents >= 0),
+  install_duration_minutes  int not null check (install_duration_minutes > 0),
+
+  primary key (vehicle_type, film_type, section)
+);
+
+alter table prices enable row level security;
+grant select on public.prices to authenticated;
+create policy "Staff read prices" on public.prices for select to authenticated using (true);
+

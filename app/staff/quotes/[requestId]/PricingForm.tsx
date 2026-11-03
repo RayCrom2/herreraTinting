@@ -20,47 +20,23 @@ import RecreateLink from "./RecreateLink";
 const inputClass =
   "w-full rounded-lg border bg-black px-3 py-2 text-right text-zinc-100 tabular-nums focus:border-red-500 focus:outline-none disabled:opacity-60";
 
-type ItemInputs = Record<string, { price: string; minutes: string }>;
-
-// Read-only box showing whether the customer asked for this work on a window.
-// `caption` is shown beside the box on mobile, where the column headers are hidden.
-function WorkCheck({
-  checked,
-  label,
-  caption,
-}: {
-  checked: boolean;
-  label: string;
-  caption: string;
-}) {
-  return (
-    <div className="flex items-center gap-2 md:justify-center md:pt-2.5">
-      <span
-        role="img"
-        aria-label={`${label}: ${checked ? "yes" : "no"}`}
-        className={`flex h-5 w-5 items-center justify-center rounded border text-xs font-bold ${
-          checked ? "border-red-500 bg-red-600 text-white" : "border-zinc-700"
-        }`}
-      >
-        {checked && "✓"}
-      </span>
-      <span aria-hidden className="text-sm text-zinc-400 md:hidden">
-        {caption}
-      </span>
-    </div>
-  );
-}
+type ItemInputs = Record<
+  string,
+  { install_price: string; removal_price: string; minutes: string }
+>;
 
 export default function PricingForm({
   requestId,
   quotes,
   locked,
   customer,
+  vehicleType,
 }: {
   requestId: string;
   quotes: PricingQuote[];
   locked: boolean;
   customer: Customer;
+  vehicleType: string | null;
 }) {
   const [state, formAction, isPending] = useActionState(
     savePricing,
@@ -74,10 +50,14 @@ export default function PricingForm({
         quote.items.map((item) => [
           item.id,
           {
-            price:
-              item.price_cents === null
+            install_price:
+              item.install_price_cents === null
                 ? ""
-                : (item.price_cents / 100).toFixed(2),
+                : (item.install_price_cents / 100).toFixed(2),
+            removal_price:
+              item.removal_price_cents === null
+                ? ""
+                : (item.removal_price_cents / 100).toFixed(2),
             minutes:
               item.duration_minutes === null
                 ? ""
@@ -98,14 +78,24 @@ export default function PricingForm({
   const savedItems = quotes.flatMap((quote) => quote.items);
   const hasUnsavedChanges = savedItems.some(
     (item) =>
-      dollarsToCents(inputs[item.id].price) !== item.price_cents ||
+      dollarsToCents(inputs[item.id].install_price) !==
+        item.install_price_cents ||
+      dollarsToCents(inputs[item.id].removal_price) !==
+        item.removal_price_cents ||
       parseMinutes(inputs[item.id].minutes) !== item.duration_minutes,
   );
   const fullyPriced = savedItems.every(
-    (item) => item.price_cents !== null && item.duration_minutes !== null,
+    (item) =>
+      (!item.install || item.install_price_cents !== null) &&
+      (!item.removal || item.removal_price_cents !== null) &&
+      item.duration_minutes !== null,
   );
 
-  function setInput(itemId: string, field: "price" | "minutes", value: string) {
+  function setInput(
+    itemId: string,
+    field: keyof ItemInputs[string],
+    value: string,
+  ) {
     setInputs((current) => ({
       ...current,
       [itemId]: { ...current[itemId], [field]: value },
@@ -135,9 +125,13 @@ export default function PricingForm({
           let totalCents = 0;
           let totalMinutes = 0;
           for (const item of quote.items) {
-            const price = dollarsToCents(inputs[item.id].price);
+            const priceInstall = dollarsToCents(inputs[item.id].install_price);
+            const priceRemove = dollarsToCents(inputs[item.id].removal_price);
             const minutes = parseMinutes(inputs[item.id].minutes);
-            if (price !== null && !Number.isNaN(price)) totalCents += price;
+            if (priceInstall !== null && !Number.isNaN(priceInstall))
+              totalCents += priceInstall;
+            if (priceRemove !== null && !Number.isNaN(priceRemove))
+              totalCents += priceRemove;
             if (minutes !== null && !Number.isNaN(minutes))
               totalMinutes += minutes;
           }
@@ -152,74 +146,97 @@ export default function PricingForm({
               </h2>
 
               {/* Mobile: each window is its own stacked block. Desktop: one table-like grid. */}
-              <div className="mt-3 grid grid-cols-1 items-start gap-y-5 md:grid-cols-[minmax(0,1fr)_4rem_4rem_7rem_5.5rem] md:gap-x-3 md:gap-y-3">
+              <div className="mt-3 grid grid-cols-1 items-start gap-y-5 md:grid-cols-[minmax(0,1fr)_7rem_7rem_5.5rem] md:items-end md:gap-x-3 md:gap-y-3">
                 <span className="hidden text-xs font-semibold uppercase tracking-wide text-zinc-500 pl-2 md:block">
                   Item
                 </span>
-                <span className="hidden text-center text-xs font-semibold uppercase tracking-wide text-zinc-500 md:block">
-                  Install
-                </span>
-                <span className="hidden text-center text-xs font-semibold uppercase tracking-wide text-zinc-500 md:block">
-                  Remove
+                <span className="hidden text-right text-xs font-semibold uppercase tracking-wide text-zinc-500 md:block">
+                  Removal ($)
                 </span>
                 <span className="hidden text-right text-xs font-semibold uppercase tracking-wide text-zinc-500 md:block">
-                  Price ($)
+                  Install ($)
                 </span>
                 <span className="hidden text-right text-xs font-semibold uppercase tracking-wide text-zinc-500 md:block">
                   Minutes
                 </span>
 
                 {quote.items.map((item) => {
-                  const priceName = `price:${item.id}`;
+                  const installName = `install_price:${item.id}`;
+                  const removalName = `removal_price:${item.id}`;
                   const minutesName = `minutes:${item.id}`;
-                  const priceError = state.errors[priceName];
+                  const priceError = state.errors[installName];
+                  const removalError = state.errors[removalName];
                   const minutesError = state.errors[minutesName];
 
                   return (
                     <div
                       key={item.id}
-                      className="grid grid-cols-2 gap-x-3 gap-y-2 md:contents"
+                      className="grid grid-cols-3 gap-x-3 gap-y-2 md:contents"
                     >
-                      <div className="col-span-2 min-w-0 md:col-span-1 md:pt-2">
+                      <div className="col-span-3 min-w-0 md:col-span-1 md:self-start md:pt-2">
                         <p className="font-medium">
                           {sectionLabels[item.section]}
                         </p>
                       </div>
-                      <WorkCheck
-                        checked={item.install}
-                        label={`${sectionLabels[item.section]} install`}
-                        caption="Install"
-                      />
-                      <WorkCheck
-                        checked={item.removal}
-                        label={`${sectionLabels[item.section]} removal`}
-                        caption="Remove"
-                      />
-                      <div>
-                        <span
-                          aria-hidden
-                          className="mb-1 block text-xs text-zinc-500 md:hidden"
-                        >
-                          Price ($)
-                        </span>
-                        <input
-                          name={priceName}
-                          inputMode="decimal"
-                          placeholder="0.00"
-                          aria-label={`${sectionLabels[item.section]} price`}
-                          value={inputs[item.id].price}
-                          onChange={(e) =>
-                            setInput(item.id, "price", e.target.value)
-                          }
-                          className={`${inputClass} ${priceError ? "border-red-500" : "border-zinc-800"}`}
-                        />
-                        {priceError && (
-                          <p className="mt-1 text-xs text-red-400">
-                            {priceError}
-                          </p>
-                        )}
-                      </div>
-                      <div>
+                      {/* Windows not being removed still get an empty cell so the columns line up. */}
+                      {item.removal ? (
+                        <div className="md:self-start">
+                          <span
+                            aria-hidden
+                            className="mb-1 block text-xs text-zinc-500 md:hidden"
+                          >
+                            Removal ($)
+                          </span>
+                          <input
+                            name={removalName}
+                            inputMode="decimal"
+                            placeholder="0.00"
+                            aria-label={`${sectionLabels[item.section]} removal price`}
+                            value={inputs[item.id].removal_price}
+                            onChange={(e) =>
+                              setInput(item.id, "removal_price", e.target.value)
+                            }
+                            className={`${inputClass} ${removalError ? "border-red-500" : "border-zinc-800"}`}
+                          />
+                          {removalError && (
+                            <p className="mt-1 text-xs text-red-400">
+                              {removalError}
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <div aria-hidden />
+                      )}
+                      {item.install ? (
+                        <div className="md:self-start">
+                          <span
+                            aria-hidden
+                            className="mb-1 block text-xs text-zinc-500 md:hidden"
+                          >
+                            Install ($)
+                          </span>
+                          <input
+                            name={installName}
+                            inputMode="decimal"
+                            placeholder="0.00"
+                            aria-label={`${sectionLabels[item.section]} price`}
+                            value={inputs[item.id].install_price}
+                            onChange={(e) =>
+                              setInput(item.id, "install_price", e.target.value)
+                            }
+                            className={`${inputClass} ${priceError ? "border-red-500" : "border-zinc-800"}`}
+                          />
+                          {priceError && (
+                            <p className="mt-1 text-xs text-red-400">
+                              {priceError}
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <div aria-hidden />
+                      )}
+
+                      <div className="md:self-start">
                         <span
                           aria-hidden
                           className="mb-1 block text-xs text-zinc-500 md:hidden"

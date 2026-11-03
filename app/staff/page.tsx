@@ -1,15 +1,6 @@
-import Link from "next/link";
 import { Suspense } from "react";
 import { requireStaff } from "../lib/dal";
 import RenderQuote from "./components/RenderQuotes";
-import {
-  filmLabels,
-  formatPhone,
-  sectionLabels,
-  shopDateFormat,
-  sortSections,
-  formatProperNoun,
-} from "../lib/quote";
 
 // Static shell renders instantly; anything reading the session or database streams in behind <Suspense>.
 export default function OpenQuotesPage() {

@@ -46,6 +46,7 @@ export default function RenderQuote({ requests }: { requests: Request[] }) {
       r.first_name,
       r.last_name,
       r.phone,
+      r.vehicle_type,
       r.vehicle_year,
       r.vehicle_make,
       r.vehicle_model,
@@ -114,12 +115,13 @@ export default function RenderQuote({ requests }: { requests: Request[] }) {
         </div>
       </div>
       <p className="mt-1 flex gap-4 px-2 text-sm text-zinc-400 pb-2">
-        {displayedQuotes.length} quotes,{" "}
+        {displayedQuotes.length} quote{displayedQuotes.length > 1 ? "s" : null},{" "}
         {isNonDescendingOrder ? "oldest" : "newest"} first
         {/* Column labels only make sense when the dates are columns (desktop) */}
         <span className="ml-auto hidden w-36 md:block">Date Quoted:</span>
         <span className="hidden w-36 md:block">Date Requested:</span>
-        <span className="hidden w-32 md:block" /> {/* the button-width spacer */}
+        <span className="hidden w-32 md:block" />{" "}
+        {/* the button-width spacer */}
       </p>
 
       <ul className="divide-y divide-zinc-800 border-y border-zinc-800">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { initialState } from "../lib/quote";
+import { initialState, vehicleTypes } from "../lib/quote";
 import { submitQuote } from "../actions/submitQuote";
 
 const filmOptions = [
@@ -19,29 +19,6 @@ const filmOptions = [
     value: "both",
     label: "Quote for Both",
     description: "Compare prices side by side",
-  },
-];
-
-const vehicleTypes = [
-  {
-    value: "coupe",
-    label: "Coupe",
-  },
-  {
-    value: "sedan",
-    label: "Sedan",
-  },
-  {
-    value: "suv",
-    label: "SUV",
-  },
-  {
-    value: "truck",
-    label: "Truck",
-  },
-  {
-    value: "other",
-    label: "Not sure",
   },
 ];
 
@@ -74,7 +51,7 @@ const conditionsOfOldTint = [
     value: "other",
     label: "Other",
   },
-]
+];
 
 // Car diagram segments, viewed from above with the front of the car on the right.
 type Segment =
@@ -91,43 +68,43 @@ const windowOptions: {
   description: string;
   tinted: Segment[] | null;
 }[] = [
-    {
-      value: "windshield",
-      label: "Full Front Windshield",
-      description: "Entire windshield",
-      tinted: ["windshield"],
-    },
-    {
-      value: "sunstrip",
-      label: "Sunstrip",
-      description: "Top strip of windshield",
-      tinted: ["strip"],
-    },
-    {
-      value: "front-sides",
-      label: "Front Driver & Passenger",
-      description: "Front door windows",
-      tinted: ["frontSides"],
-    },
-    {
-      value: "rear-sides",
-      label: "Rear Passenger Side Windows",
-      description: "Rear door + quarter windows",
-      tinted: ["rearSides"],
-    },
-    {
-      value: "rear-windshield",
-      label: "Rear Windshield",
-      description: "Back glass",
-      tinted: ["back"],
-    },
-    {
-      value: "sunroof",
-      label: "Sunroof",
-      description: "Sunroof or moonroof glass",
-      tinted: ["sunroof"],
-    },
-  ];
+  {
+    value: "windshield",
+    label: "Full Front Windshield",
+    description: "Entire windshield",
+    tinted: ["windshield"],
+  },
+  {
+    value: "sunstrip",
+    label: "Sunstrip",
+    description: "Top strip of windshield",
+    tinted: ["strip"],
+  },
+  {
+    value: "front-sides",
+    label: "Front Driver & Passenger",
+    description: "Front door windows",
+    tinted: ["frontSides"],
+  },
+  {
+    value: "rear-sides",
+    label: "Rear Passenger Side Windows",
+    description: "Rear door + quarter windows",
+    tinted: ["rearSides"],
+  },
+  {
+    value: "rear-windshield",
+    label: "Rear Windshield",
+    description: "Back glass",
+    tinted: ["back"],
+  },
+  {
+    value: "sunroof",
+    label: "Sunroof",
+    description: "Sunroof or moonroof glass",
+    tinted: ["sunroof"],
+  },
+];
 
 function CarDiagram({ tinted }: { tinted: Segment[] | null }) {
   const fill = (segment: Segment) =>
@@ -426,9 +403,7 @@ export default function QuoteForm() {
 
       <fieldset>
         <legend className={`${labelClass} flex items-center gap-3`}>
-          <span>
-            What Type of Film
-          </span>
+          <span>What Type of Film</span>
           <a
             href="#compare-films"
             className="text-xs font-semibold text-red-500 hover:underline"
@@ -497,7 +472,10 @@ export default function QuoteForm() {
               Pick all that apply, or leave blank if none.
             </span>
           </legend>
-          <WindowPicker name="removalWindows" selected={values.removalWindows} />
+          <WindowPicker
+            name="removalWindows"
+            selected={values.removalWindows}
+          />
           <label className="mt-3 flex items-center gap-3 py-1 text-sm text-zinc-300 group-has-[input[name=removalWindows]:checked]:hidden">
             <input
               type="checkbox"
@@ -510,46 +488,48 @@ export default function QuoteForm() {
           <FieldError message={errors.removalWindows} />
         </fieldset>
 
-
         <div className="relative hidden group-has-[input[name=removalWindows]:checked]/removal:block">
-        <label htmlFor="oldTintCondition" className={labelClass}>Old Tint Condition <span className="text-red-500">*</span></label>
+          <label htmlFor="oldTintCondition" className={labelClass}>
+            Old Tint Condition <span className="text-red-500">*</span>
+          </label>
           <select
-          key={String(values.oldTintCondition ?? "")}
-          id="oldTintCondition"
-          name="oldTintCondition"
-          defaultValue={values.oldTintCondition ?? ""}
-          className={`${inputClass} appearance-none pr-10 invalid:text-zinc-500`}
-          required>
-          <option value="" disabled>
-            Select
-          </option>
-          {conditionsOfOldTint.map((condition) => {
-            return (
-            <option 
-            key={condition.value} 
-            value={condition.value}
-            className="text-zinc-100">
-              {condition.label}
-            </option>)
-          })}
-        </select>
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 20 20"
-          fill="currentColor"
-          className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400"
-        >
-          <path
-            fillRule="evenodd"
-            d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
-            clipRule="evenodd"
-          />
-        </svg>
-          </div>
+            key={String(values.oldTintCondition ?? "")}
+            id="oldTintCondition"
+            name="oldTintCondition"
+            defaultValue={values.oldTintCondition ?? ""}
+            className={`${inputClass} appearance-none pr-10 invalid:text-zinc-500`}
+            required
+          >
+            <option value="" disabled>
+              Select
+            </option>
+            {conditionsOfOldTint.map((condition) => {
+              return (
+                <option
+                  key={condition.value}
+                  value={condition.value}
+                  className="text-zinc-100"
+                >
+                  {condition.label}
+                </option>
+              );
+            })}
+          </select>
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400"
+          >
+            <path
+              fillRule="evenodd"
+              d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+              clipRule="evenodd"
+            />
+          </svg>
+        </div>
         <FieldError message={errors.oldTintCondition} />
-
       </div>
-
 
       <div>
         <label htmlFor="comment" className={labelClass}>

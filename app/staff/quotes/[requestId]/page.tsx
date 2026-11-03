@@ -10,6 +10,7 @@ import {
   formatProperNoun,
 } from "../../../lib/quote";
 import PricingForm from "./PricingForm";
+import VehicleTypePreset from "./VehicleTypePreset";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -44,8 +45,8 @@ async function QuoteRequestDetail({
     .select(
       `
       id, created_at, first_name, last_name, phone,
-      vehicle_year, vehicle_make, vehicle_model, removal_request, comment, replied_at,
-      quotes ( id, film_type, quote_items ( id, section, install, removal, price_cents, duration_minutes ) )
+      vehicle_type, vehicle_year, vehicle_make, vehicle_model, removal_request, old_tint_condition, comment, replied_at,
+      quotes ( id, film_type, quote_items ( id, section, install, removal, install_price_cents, removal_price_cents, duration_minutes ) )
     `,
     )
     .eq("id", requestId)
@@ -60,14 +61,18 @@ async function QuoteRequestDetail({
     items: sortBySection(quote.quote_items),
   }));
   const locked = request.replied_at !== null;
+  const vehicleType = request.vehicle_type ?? null;
 
   return (
     <>
       <header className="mt-4">
-        <h1 className="text-3xl font-bold">
-          {request.vehicle_year} {formatProperNoun(request.vehicle_make)}{" "}
-          {formatProperNoun(request.vehicle_model)}
-        </h1>
+        <div className="flex items-center relative">
+          <h1 className="text-3xl font-bold">
+            {request.vehicle_year} {formatProperNoun(request.vehicle_make)}{" "}
+            {formatProperNoun(request.vehicle_model)}
+          </h1>
+        </div>
+
         <p className="mt-2 text-zinc-300">
           {request.first_name} {request.last_name} ·{" "}
           <a
@@ -77,28 +82,28 @@ async function QuoteRequestDetail({
             {formatPhone(request.phone)}
           </a>
         </p>
-        <div className="flex mt-1">
-          <p className="text-sm text-zinc-400">
-            Received {shopDateFormat.format(new Date(request.created_at))}
-          </p>
-          <span className="ml-auto">
-            {request.removal_request &&
-              request.removal_request === "not-sure" &&
-              "Not sure about removal"}
-          </span>
-        </div>
+        <div>
+          <div className="flex mt-1 relative h-12">
+            <p className="text-sm text-zinc-400">
+              Received {shopDateFormat.format(new Date(request.created_at))}
+            </p>
+            <div className="absolute right-0 top-0">
+              <VehicleTypePreset currentType={vehicleType} locked={locked} />
+            </div>
+          </div>
 
-        {request.comment && (
-          <blockquote className="mt-4 border-l-2 border-zinc-700 pl-3 text-zinc-300">
-            {request.comment}
-          </blockquote>
-        )}
-        {locked && (
-          <p className="mt-4 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-300">
-            Sent {shopDateFormat.format(new Date(request.replied_at))}. Prices
-            are locked.
-          </p>
-        )}
+          {request.comment && (
+            <blockquote className="whitespace-pre-line wrap-break-word mt-4 border-l-2 border-zinc-700 pl-3 text-zinc-300 pr-30">
+              {request.comment}
+            </blockquote>
+          )}
+          {locked && (
+            <p className="mt-4 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-300">
+              Sent {shopDateFormat.format(new Date(request.replied_at))}. Prices
+              are locked.
+            </p>
+          )}
+        </div>
       </header>
 
       <PricingForm
@@ -106,6 +111,7 @@ async function QuoteRequestDetail({
         quotes={quotes}
         locked={locked}
         customer={{ firstName: request.first_name, phone: request.phone }}
+        vehicleType={vehicleType}
       />
     </>
   );
