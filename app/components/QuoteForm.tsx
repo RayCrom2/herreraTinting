@@ -340,6 +340,9 @@ export default function QuoteForm() {
                   {option.label}
                 </option>
               ))}
+              <option value="other" className="text-zinc-100">
+                Not sure
+              </option>
             </select>
             <svg
               aria-hidden="true"

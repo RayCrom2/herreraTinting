@@ -167,8 +167,4 @@ export const vehicleTypes = [
     value: "truck",
     label: "Truck",
   },
-  {
-    value: "other",
-    label: "Not sure",
-  },
 ];
