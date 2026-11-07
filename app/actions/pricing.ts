@@ -1,7 +1,7 @@
 "use server";
 import { refresh } from "next/cache";
 import { requireStaff } from "../lib/dal";
-import { dollarsToCents, parseMinutes, type PricingState } from "../lib/quote";
+import { dollarsToCents, parseMinutes, fieldName, type PricingState } from "../lib/quote";
 
 export async function savePricing(_prevState: PricingState, formData: FormData): Promise<PricingState> {
   const { supabase } = await requireStaff();
@@ -30,16 +30,23 @@ export async function savePricing(_prevState: PricingState, formData: FormData):
     let totalMinutes: number | null = null;
 
     for (const item of quote.quote_items) {
-      const priceName = `price:${item.id}`;
-      const minutesName = `minutes:${item.id}`;
-      const price = dollarsToCents(String(formData.get(priceName) ?? ""));
+      // Install price is per film (item id). Removal and minutes don't depend on the film,
+      // so the form has one box per window (section) and every quote's item gets that value.
+      const installName = fieldName("install_price", item.id);
+      const removalName = fieldName("removal_price", item.section);
+      const minutesName = fieldName("minutes", item.section);
+      // Only read a price for the work this row does; the schema requires the other to stay null.
+      const installPrice = item.install ? dollarsToCents(String(formData.get(installName) ?? "")) : null;
+      const removalPrice = item.removal ? dollarsToCents(String(formData.get(removalName) ?? "")) : null;
       const minutes = parseMinutes(String(formData.get(minutesName) ?? ""));
 
-      if (Number.isNaN(price)) errors[priceName] = "Enter a dollar amount, like 120 or 120.50.";
+      if (Number.isNaN(installPrice)) errors[installName] = "Enter a dollar amount, like 120 or 120.50.";
+      if (Number.isNaN(removalPrice)) errors[removalName] = "Enter a dollar amount, like 120 or 120.50.";
       if (Number.isNaN(minutes)) errors[minutesName] = "Enter whole minutes above 0.";
 
-      itemRows.push({ ...item, price_cents: price, duration_minutes: minutes });
-      if (price !== null) totalCents = (totalCents ?? 0) + price;
+      itemRows.push({ ...item, install_price_cents: installPrice, removal_price_cents: removalPrice, duration_minutes: minutes });
+      if (installPrice !== null) totalCents = (totalCents ?? 0) + installPrice;
+      if (removalPrice !== null) totalCents = (totalCents ?? 0) + removalPrice;
       if (minutes !== null) totalMinutes = (totalMinutes ?? 0) + minutes;
     }
 
