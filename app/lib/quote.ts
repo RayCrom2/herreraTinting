@@ -77,7 +77,13 @@ export function formatMinutes(total: number) {
   const hours = Math.floor(total / 60);
   const minutes = total % 60;
   if (hours === 0) return `${minutes} minutes`;
-  return minutes === 0 ? `${hours} hours` : `${hours} hours ${minutes} minutes`;
+  if (hours === 1){
+    if (minutes === 0) return '1 hour';
+    if (minutes === 1) return '1 hour 1 minute';
+    return `1 hour ${minutes} minutes`
+  }
+  if (minutes === 1) return `${hours} hours 1 minute`
+  return `${hours} hours ${minutes} minutes`;
 }
 
 export function formatPhone(digits: string | null) {
@@ -168,3 +174,7 @@ export const vehicleTypes = [
     label: "Truck",
   },
 ];
+
+export const fieldName = (kind: "install_price" | "removal_price" | "minutes", id: string):string => {
+  return `${kind}:${id}`;
+}
