@@ -342,3 +342,4 @@ alter table prices enable row level security;
 grant select on public.prices to authenticated;
 create policy "Staff read prices" on public.prices for select to authenticated using (true);
 
+-- 11. Bookings list all bookings made by users on the calendar.
