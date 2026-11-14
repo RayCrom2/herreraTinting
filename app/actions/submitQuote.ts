@@ -13,11 +13,11 @@ const requiredFields: Record<string, errorChecks> = {
   firstName: {message: "Please enter your first name.", maxLength: 50},
   lastName: {message: "Please enter your last name.", maxLength: 100},
   phone: {message: "Please enter your phone number."},
+  vehicleType: {message: "Please select an option that best describes your vehicle type."},
   vehicleYear: {message: "Please enter your vehicle's year.", maxLength: 5, min: 1800, max: 2100},
   vehicleMake: {message: "Please enter your vehicle's make.", maxLength: 50},
   vehicleModel: {message: "Please enter your vehicle's model.", maxLength: 50},
   film: {message: "Please choose a film type."},
-  windows: {message: "Please choose which windows need tint."},
   terms: {message: "Please agree to the terms to continue."},
 };
 
@@ -32,7 +32,33 @@ export async function submitQuote(_prevState: FormState, formData: FormData): Pr
   // Checkboxes send one "windows" entry per checked box, so collect them all.
   values.windows = formData.getAll("windows").map(String);
   values.removalWindows = formData.getAll("removalWindows").map(String);
+
   const removalRequest = values.removalWindows.length > 0 ? "yes" : values.removalNotSure ? "not-sure" : "no";
+  const vehicleType = values.vehicleType === "other" ? null : values.vehicleType;
+  const film = values.film === "removal-only" ? null : values.film;
+
+  if (values.film === "removal-only") {
+    if (values.removalWindows.length === 0) {
+      errors["removalWindows"] = "Please choose which windows need old tint removed.";
+    }
+    if (values.windows.length > 0) {
+      errors["windows"] = "You chose Removal Only, so leave these blank or pick a film.";
+    }
+  } else if (values.film && values.windows.length === 0) {
+    errors["windows"] = "Please choose which windows need tint.";
+  }
+
+  if (removalRequest === "yes"){
+    if (!values.oldTintCondition){
+      errors["oldTintCondition"] = "Please select the condition of the old tint you need removed.";
+    }
+    else if (values.oldTintCondition === "other"){
+      if (!values.comment){
+        errors["comment"] = "You selected other for 'Old Tint Condition', please elaborate."
+      }
+    }
+  }
+
 
   
   for (const [field, dict] of Object.entries(requiredFields)) {
@@ -68,25 +94,26 @@ export async function submitQuote(_prevState: FormState, formData: FormData): Pr
     return { success: false, errors, values };
   }
 
-  // Map form fields to columns explicitly so extra form keys never reach the database.
     // Keys must match the SQL parameter names exactly; extra form keys never reach the database.
   const { error } = await supabase.rpc("submit_quote_request", {
     p_first_name: values.firstName,
     p_last_name: values.lastName,
     p_phone: phoneDigits,
+    p_vehicle_type: vehicleType,
     p_vehicle_year: Number(values.vehicleYear),
     p_vehicle_make: values.vehicleMake,
     p_vehicle_model: values.vehicleModel,
     p_source: "website",
-    p_film: values.film,
+    p_film: film,
     p_windows: values.windows,
     p_removal_request: removalRequest,
     p_removal_windows: values.removalWindows,
+    p_old_tint_condition: removalRequest === "yes" ? values.oldTintCondition : null,
     p_comment: values.comment || null,
   });
 
   if (error) {
-    // console.error("Failed to save quote request:", error);
+    console.error("Failed to save quote request:", error);
     return { success: false, errors: { form: "Something went wrong, please try again." }, values };
   }
 

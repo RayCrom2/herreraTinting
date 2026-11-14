@@ -38,36 +38,77 @@ async function QuoteRequestDetail({
   // Postgres rejects malformed UUIDs with an error, so treat them as "not found" up front.
   if (!UUID.test(requestId)) notFound();
 
+  // Database retrieval
   const { supabase } = await requireStaff();
   const { data: request, error } = await supabase
     .from("quote_requests")
     .select(
       `
       id, created_at, first_name, last_name, phone,
-      vehicle_year, vehicle_make, vehicle_model, removal_request, comment, replied_at,
-      quotes ( id, film_type, quote_items ( id, section, install, removal, price_cents, duration_minutes ) )
+      vehicle_type, vehicle_year, vehicle_make, vehicle_model, removal_request, old_tint_condition, comment, replied_at,
+      quotes ( id, film_type, staff_note, quote_items ( id, section, install, removal, install_price_cents, removal_price_cents, duration_minutes ) )
     `,
     )
     .eq("id", requestId)
     .maybeSingle();
-
   if (error) throw new Error(`Failed to load quote request: ${error.message}`);
   if (!request) notFound();
+
+  const { data: prices, error: pricesError } = await supabase
+    .from("prices")
+    .select(`vehicle_type, film_type, section, install_price_cents`);
+  if (pricesError)
+    throw new Error(`Failed to load prices: ${pricesError.message}`);
+  if (!prices) notFound();
+
+  const { data: installTimes, error: installTimesError } = await supabase
+    .from("install_times")
+    .select(`vehicle_type, section, install_duration_minutes`);
+  if (installTimesError)
+    throw new Error(
+      `Failed to load install times: ${installTimesError.message}`,
+    );
+  if (!installTimes) notFound();
 
   const quotes: PricingQuote[] = sortByFilm(request.quotes).map((quote) => ({
     id: quote.id,
     film_type: quote.film_type,
     items: sortBySection(quote.quote_items),
   }));
+  /* ex:
+[
+  {
+    id: "uuid-1",
+    film_type: "c2-carbon",
+    items: [
+      { id: "uuid-a", section: "sunstrip", install: true, removal: false,
+        install_price_cents: 4000, removal_price_cents: null, duration_minutes: 20 },
+      { id: "uuid-b", section: "front-sides", install: true, removal: true,
+        install_price_cents: null, removal_price_cents: 5000, duration_minutes: 45 },
+    ],
+  },
+  {
+    id: "uuid-2",
+    film_type: "pronano-ceramic",
+    items: [ ...same sections, its own install prices... ],
+  },
+]
+*/
   const locked = request.replied_at !== null;
+  const vehicleType = request.vehicle_type ?? null;
+  // One note for the whole request; it's saved onto every quote, so any quote's copy will do.
+  const staffNote = request.quotes[0]?.staff_note ?? "";
 
   return (
     <>
       <header className="mt-4">
-        <h1 className="text-3xl font-bold">
-          {request.vehicle_year} {formatProperNoun(request.vehicle_make)}{" "}
-          {formatProperNoun(request.vehicle_model)}
-        </h1>
+        <div className="flex items-center relative">
+          <h1 className="text-3xl font-bold">
+            {request.vehicle_year} {formatProperNoun(request.vehicle_make)}{" "}
+            {formatProperNoun(request.vehicle_model)}
+          </h1>
+        </div>
+
         <p className="mt-2 text-zinc-300">
           {request.first_name} {request.last_name} ·{" "}
           <a
@@ -77,28 +118,25 @@ async function QuoteRequestDetail({
             {formatPhone(request.phone)}
           </a>
         </p>
-        <div className="flex mt-1">
-          <p className="text-sm text-zinc-400">
-            Received {shopDateFormat.format(new Date(request.created_at))}
-          </p>
-          <span className="ml-auto">
-            {request.removal_request &&
-              request.removal_request === "not-sure" &&
-              "Not sure about removal"}
-          </span>
-        </div>
+        <div>
+          <div className="flex mt-1 relative h-12">
+            <p className="text-sm text-zinc-400">
+              Received {shopDateFormat.format(new Date(request.created_at))}
+            </p>
+          </div>
 
-        {request.comment && (
-          <blockquote className="mt-4 border-l-2 border-zinc-700 pl-3 text-zinc-300">
-            {request.comment}
-          </blockquote>
-        )}
-        {locked && (
-          <p className="mt-4 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-300">
-            Sent {shopDateFormat.format(new Date(request.replied_at))}. Prices
-            are locked.
-          </p>
-        )}
+          {request.comment && (
+            <blockquote className="whitespace-pre-line wrap-break-word mt-4 border-l-2 border-zinc-700 pl-3 text-zinc-300 pr-30">
+              {request.comment}
+            </blockquote>
+          )}
+          {locked && (
+            <p className="mt-4 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-300">
+              Sent {shopDateFormat.format(new Date(request.replied_at))}. Prices
+              are locked.
+            </p>
+          )}
+        </div>
       </header>
 
       <PricingForm
@@ -106,6 +144,11 @@ async function QuoteRequestDetail({
         quotes={quotes}
         locked={locked}
         customer={{ firstName: request.first_name, phone: request.phone }}
+        vehicleType={vehicleType}
+        prices={prices}
+        installTimes={installTimes}
+        currentCondition={request.old_tint_condition}
+        staffNote={staffNote}
       />
     </>
   );

@@ -1,13 +1,16 @@
 -- Quote schema v2: quote_requests > quotes > quote_items
 --
--- WARNING: this is a fresh start. It DROPS quote_requests, quotes, quote_items and bookings
--- (if they exist) and everything in them. Only run it while the data is test data.
+-- WARNING: this is a fresh start. It DROPS quote_requests, quotes, quote_items, bookings,
+-- prices and install_times (if they exist) and everything in them, including the price list.
+-- Only run it while the data is test data.
 
 drop table if exists quote_links    cascade;
 drop table if exists bookings       cascade;
 drop table if exists quote_items    cascade;
 drop table if exists quotes         cascade;
 drop table if exists quote_requests cascade;
+drop table if exists prices         cascade;
+drop table if exists install_times  cascade;
 
 -- 1. The customer's request: who they are, their car, their comment
 create table quote_requests (
@@ -18,19 +21,23 @@ create table quote_requests (
   last_name       text check (char_length(last_name) <= 100),   -- nullable for Instagram/phone leads
   phone           text check (phone ~ '^\d{10}$'),              -- 10 US digits, normalized by submitQuote
 
+  vehicle_type    text check (vehicle_type in ('coupe', 'sedan', 'suv', 'truck')),
   vehicle_year    int  check (vehicle_year between 1800 and 2100),
   vehicle_make    text check (char_length(vehicle_make) <= 50),
   vehicle_model   text check (char_length(vehicle_model) <= 50),
 
   -- The customer's answer for the whole car. Staff set removal per window on quote_items.
   removal_request text check (removal_request in ('no', 'yes', 'not-sure')),
+  old_tint_condition text check (old_tint_condition in ('peeling', 'bubbly', 'faded', 'blurry_hazy', 'discolored', 'fine', 'other')),
+
 
   source          text not null
                   check (source in ('website', 'instagram', 'phone', 'text', 'other')),
 
   comment         text check (char_length(comment) <= 500),
 
-  replied_at      timestamptz                   -- null until staff send the quote(s); lock quotes once set
+  replied_at      timestamptz,                   -- null until staff send the quote(s); lock quotes once set
+  check (old_tint_condition is null or removal_request = 'yes')
 );
 
 -- 2. A priced option under a request: one per film ('both' on the form creates two)
@@ -69,9 +76,12 @@ create table quote_items (
 
   install           boolean not null default true,    -- put new tint on this area
   removal           boolean not null default false,   -- take old tint off; window was in customer's removal list
-  price_cents       int check (price_cents >= 0),     -- null until staff price it
+  removal_price_cents int,
+  install_price_cents int,     -- null until staff price it
   duration_minutes  int check (duration_minutes > 0), -- null until staff set it
 
+  check ((install and install_price_cents >= 0) or install_price_cents is null),
+  check ((removal and removal_price_cents >= 0) or removal_price_cents is null),
   check (install or removal),                         -- a row must do something
   unique (quote_id, section)                          -- each window area appears once per quote
 );
@@ -85,6 +95,7 @@ grant select, insert, update, delete on public.quote_requests to service_role;
 grant select, insert, update, delete on public.quotes         to service_role;
 grant select, insert, update, delete on public.quote_items    to service_role;
 
+drop function if exists public.submit_quote_request(text, text, text, int, text, text, text, text, text[], text, text[], text);
 -- 5. Called by app/actions/submitQuote.ts. Creates the request, one quote per film,
 --    and one item per window in a single transaction; any failure rolls back all of it.
 create or replace function public.submit_quote_request(
@@ -92,14 +103,16 @@ create or replace function public.submit_quote_request(
   p_first_name     text,
   p_last_name      text,
   p_phone          text,     -- already normalized to 10 digits in submitQuote
+  p_vehicle_type   text,
   p_vehicle_year   int,
   p_vehicle_make   text,
   p_vehicle_model  text,
   p_source         text,
-  p_film           text,     -- 'c2-carbon' | 'pronano-ceramic' | 'both'
+  p_film           text,     -- 'c2-carbon' | 'pronano-ceramic' | 'both' | 'null' (removal only)
   p_windows        text[],   -- e.g. {'front-sides','sunroof'}
   p_removal_request text,     -- 'yes' | 'no' | 'not-sure'
   p_removal_windows text[],   -- e.g. {'front-sides','sunroof'}
+  p_old_tint_condition text,
   p_comment        text default null   -- optional, so it goes last
 )
 returns uuid                    -- the new quote_requests.id
@@ -113,17 +126,25 @@ declare
   v_films       text[];         -- 'both' expands to two films
   v_film        text;
 begin
-  if coalesce(cardinality(p_windows), 0) = 0 then
-    raise exception 'At least one window is required';
+    -- Removal Only (no film) has nothing to install; a film needs windows to install on.
+  if (p_film is null) <> (coalesce(cardinality(p_windows), 0) = 0) then
+    raise exception 'Film and tint windows do not match';
+  end if;
+  if coalesce(cardinality(p_windows), 0) = 0
+    and coalesce(cardinality(p_removal_windows), 0) = 0 then
+    raise exception 'At least one window to tint or remove is required';
   end if;
 
-  insert into public.quote_requests (first_name, last_name, phone, vehicle_year, vehicle_make, vehicle_model, removal_request, source, comment)
-  values (p_first_name, p_last_name, p_phone, p_vehicle_year, p_vehicle_make, p_vehicle_model, p_removal_request, p_source, p_comment)
+
+
+  insert into public.quote_requests (first_name, last_name, phone, vehicle_type, vehicle_year, vehicle_make, vehicle_model, removal_request, old_tint_condition, source, comment)
+  values (p_first_name, p_last_name, p_phone, p_vehicle_type, p_vehicle_year, p_vehicle_make, p_vehicle_model, p_removal_request, p_old_tint_condition, p_source, p_comment)
   returning id into v_request_id;
 
-  v_films := case when p_film = 'both'
-                  then array['c2-carbon', 'pronano-ceramic']
-                  else array[p_film] end;
+  v_films := case when p_film is null then array[null::text]   -- removal only
+             when p_film = 'both' then array['c2-carbon', 'pronano-ceramic']
+             else array[p_film] end;
+
 
   foreach v_film in array v_films loop
     insert into public.quotes (quote_request_id, film_type)
@@ -142,9 +163,9 @@ end;
 $$;
 
 -- Only server code should call it
-revoke execute on function public.submit_quote_request(text, text, text, int, text, text, text, text, text[], text, text[], text)
+revoke execute on function public.submit_quote_request(text, text, text, text, int, text, text, text, text, text[], text, text[], text, text)
   from public, anon, authenticated;
-grant execute on function public.submit_quote_request(text, text, text, int, text, text, text, text, text[], text, text[], text)
+grant execute on function public.submit_quote_request(text, text, text, text, int, text, text, text, text, text[], text, text[], text, text)
   to service_role;
 
 -- 6. Staff access: logged-in staff (the authenticated role) via app/lib/dal.ts.
@@ -233,7 +254,9 @@ begin
     from public.quote_items i
     join public.quotes q on q.id = i.quote_id
     where q.quote_request_id = p_request_id
-      and (i.price_cents is null or i.duration_minutes is null)
+      and ((i.install and i.install_price_cents is null)
+      or (i.removal and i.removal_price_cents is null)
+      or i.duration_minutes is null)
   ) then
     raise exception 'Every window needs a price and time before sending';
   end if;
@@ -301,3 +324,83 @@ $$;
 -- Only logged-in staff can send. (Every authenticated user is staff; see claude/memory.md.)
 revoke execute on function public.resend_quote(uuid, text) from public, anon;
 grant execute on function public.resend_quote(uuid, text) to authenticated;
+
+-- 10. Default install prices staff start from when pricing a quote. One row per vehicle type, film and window.
+--     Removal isn't here: it varies too much, so staff price it by hand.
+create table prices (
+  vehicle_type      text not null check (vehicle_type in ('coupe', 'sedan', 'suv', 'truck')),
+  film_type         text not null check (film_type in ('c2-carbon', 'pronano-ceramic')),
+  section           text not null check (section in (
+                      'windshield', 'sunstrip', 'side-pair',
+                      'rear-windshield', 'sunroof'
+                    )),
+
+  install_price_cents       int not null check (install_price_cents >= 0),
+
+  primary key (vehicle_type, film_type, section)
+);
+
+alter table prices enable row level security;
+grant select on public.prices to authenticated;
+create policy "Staff read prices" on public.prices for select to authenticated using (true);
+
+-- 11. Default install time per vehicle type and window. Time doesn't depend on the film,
+--     so it's stored once here instead of on every film's row in prices.
+create table install_times (
+  vehicle_type      text not null check (vehicle_type in ('coupe', 'sedan', 'suv', 'truck')),
+  section           text not null check (section in (
+                      'windshield', 'sunstrip', 'side-pair',
+                      'rear-windshield', 'sunroof'
+                    )),
+
+  install_duration_minutes  int not null check (install_duration_minutes > 0),
+
+  primary key (vehicle_type, section)
+);
+
+alter table install_times enable row level security;
+grant select on public.install_times to authenticated;
+create policy "Staff read install times" on public.install_times for select to authenticated using (true);
+
+-- 12. Bookings list all bookings made by users on the calendar.
+
+-- 13. Keeps quotes.total_cost_cents and quotes.duration_minutes in sync with their items.
+--     Runs inside the same statement as the item update, so they save together or not at all.
+create or replace function public.recalc_quote_totals()
+returns trigger
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+begin
+  update public.quotes q
+  set
+    -- sum() skips nulls and is null only when every value is null, so a quote with
+    -- no prices stays null. coalesce picks the first non-null: both sums added, else
+    -- whichever one exists, else null.
+    total_cost_cents = coalesce(t.install_sum + t.removal_sum, t.install_sum, t.removal_sum),
+    duration_minutes = t.minutes_sum
+  from (
+    -- One row per changed quote, with each sum computed once.
+    select
+      i.quote_id,
+      sum(i.install_price_cents) as install_sum,
+      sum(i.removal_price_cents) as removal_sum,
+      sum(i.duration_minutes)    as minutes_sum
+    from public.quote_items i
+    where i.quote_id in (select quote_id from changed_items)
+    group by i.quote_id
+  ) t
+  where q.id = t.quote_id;
+
+  return null;  -- the return value is ignored for AFTER ... FOR EACH STATEMENT triggers
+end;
+$$;
+
+-- Only UPDATE: new items start with null prices, so inserts never change a total.
+-- savePricing's upsert hits existing rows, which fires this as an update.
+create trigger quote_items_recalc_totals
+after update on public.quote_items
+referencing new table as changed_items
+for each statement
+execute function public.recalc_quote_totals();

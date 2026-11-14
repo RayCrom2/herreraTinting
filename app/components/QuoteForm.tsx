@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { initialState } from "../lib/quote";
+import { initialState, vehicleTypes, oldTintConditions } from "../lib/quote";
 import { submitQuote } from "../actions/submitQuote";
 
 const filmOptions = [
@@ -171,7 +171,13 @@ function CarDiagram({ tinted }: { tinted: Segment[] | null }) {
 }
 
 // One card per window area. Used for both "needs tint" and "needs removal".
-function WindowPicker({ name, selected }: { name: string; selected?: string | string[] }) {
+function WindowPicker({
+  name,
+  selected,
+}: {
+  name: string;
+  selected?: string | string[];
+}) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
       {windowOptions.map((option) => (
@@ -180,7 +186,9 @@ function WindowPicker({ name, selected }: { name: string; selected?: string | st
             type="checkbox"
             name={name}
             value={option.value}
-            defaultChecked={Array.isArray(selected) && selected.includes(option.value)}
+            defaultChecked={
+              Array.isArray(selected) && selected.includes(option.value)
+            }
             className="sr-only"
           />
           <CarDiagram tinted={option.tinted} />
@@ -204,8 +212,6 @@ const inputClass =
   "w-full rounded-xl border border-zinc-800 bg-black px-4 py-3.5 text-zinc-100 placeholder:text-zinc-500 focus:border-red-500 focus:outline-none";
 const optionCardClass =
   "flex h-full cursor-pointer flex-col rounded-xl border border-zinc-800 bg-zinc-950 p-3 transition-colors hover:border-zinc-600 has-[:checked]:border-red-500 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-red-500";
-
-
 
 export default function QuoteForm() {
   const [state, formAction, isPending] = useActionState(
@@ -275,9 +281,54 @@ export default function QuoteForm() {
         <FieldError message={errors.phone} />
       </div>
 
-      {/* Mobile: Year on its own row, Make & Model side by side. */}
-      <div className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 sm:gap-x-6">
-        <div className="col-span-2 sm:col-span-1">
+      {/* Mobile: Type & Year side by side, then Make & Model. */}
+      <div className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-4 sm:gap-x-6">
+        <div>
+          <label htmlFor="vehicleType" className={labelClass}>
+            Vehicle Type <span className="text-red-500">*</span>
+          </label>
+          <div className="relative">
+            {/* key remounts the select so a failed submit keeps the choice; React only reads a select's defaultValue on mount. */}
+            <select
+              key={String(values.vehicleType ?? "")}
+              id="vehicleType"
+              name="vehicleType"
+              defaultValue={values.vehicleType ?? ""}
+              className={`${inputClass} appearance-none pr-10 invalid:text-zinc-500`}
+              required
+            >
+              <option value="" disabled>
+                Select
+              </option>
+              {vehicleTypes.map((option) => (
+                <option
+                  key={option.label}
+                  value={option.value}
+                  className="text-zinc-100"
+                >
+                  {option.label}
+                </option>
+              ))}
+              <option value="other" className="text-zinc-100">
+                Not sure
+              </option>
+            </select>
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400"
+            >
+              <path
+                fillRule="evenodd"
+                d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </div>
+          <FieldError message={errors.vehicleType} />
+        </div>
+        <div>
           <label htmlFor="vehicleYear" className={labelClass}>
             Vehicle Year <span className="text-red-500">*</span>
           </label>
@@ -300,7 +351,7 @@ export default function QuoteForm() {
             id="vehicleMake"
             name="vehicleMake"
             type="text"
-            placeholder="e.g. Mercedes-AMG"
+            placeholder="e.g. Honda"
             defaultValue={values.vehicleMake}
             className={inputClass}
           />
@@ -314,7 +365,7 @@ export default function QuoteForm() {
             id="vehicleModel"
             name="vehicleModel"
             type="text"
-            placeholder="e.g. C63"
+            placeholder="e.g. Accord"
             defaultValue={values.vehicleModel}
             className={inputClass}
           />
@@ -324,9 +375,7 @@ export default function QuoteForm() {
 
       <fieldset>
         <legend className={`${labelClass} flex items-center gap-3`}>
-          <span>
-            What Type of Film <span className="text-red-500">*</span>
-          </span>
+          <span>What Type of Film</span>
           <a
             href="#compare-films"
             className="text-xs font-semibold text-red-500 hover:underline"
@@ -351,6 +400,26 @@ export default function QuoteForm() {
             </label>
           ))}
         </div>
+
+        {/* Not a film, so it sits apart: same radio group, quieter card. */}
+        <div className="my-3 flex items-center gap-3 text-xs text-zinc-500">
+          <span className="h-px flex-1 bg-zinc-800" />
+          or
+          <span className="h-px flex-1 bg-zinc-800" />
+        </div>
+        <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-dashed border-zinc-500 px-4 py-3 transition-colors hover:border-zinc-600 has-[:checked]:border-solid has-[:checked]:border-red-500 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-red-500">
+          <input
+            type="radio"
+            name="film"
+            value="removal-only"
+            defaultChecked={values.film === "removal-only"}
+            className="sr-only"
+          />
+          <span className="text-sm font-semibold">Removal Only</span>
+          <span className="text-xs text-zinc-400">
+            Just take the old tint off
+          </span>
+        </label>
         <FieldError message={errors.film} />
       </fieldset>
 
@@ -365,26 +434,74 @@ export default function QuoteForm() {
         <FieldError message={errors.windows} />
       </fieldset>
 
-      {/* group: the "Not sure" box hides itself once any removal window is checked. */}
-      <fieldset className="group">
-        <legend className={labelClass}>
-          Which Windows Need Old Tint Removed?{" "}
-          <span className="mt-0.5 block text-xs font-normal text-zinc-400 sm:mt-0 sm:inline">
-            Pick all that apply, or leave blank if none.
-          </span>
-        </legend>
-        <WindowPicker name="removalWindows" selected={values.removalWindows} />
-        <label className="mt-3 flex items-center gap-3 py-1 text-sm text-zinc-300 group-has-[input[name=removalWindows]:checked]:hidden">
-          <input
-            type="checkbox"
-            name="removalNotSure"
-            defaultChecked={values.removalNotSure === "on"}
-            className="size-5 shrink-0 accent-red-500 sm:size-4"
+      {/* group/removal: blocks after the fieldset react to removal windows being checked. */}
+      <div className="group/removal space-y-6">
+        {/* group: the "Not sure" box hides itself once any removal window is checked. */}
+        <fieldset className="group">
+          <legend className={labelClass}>
+            Which Windows Need Old Tint Removed?{" "}
+            <span className="mt-0.5 block text-xs font-normal text-zinc-400 sm:mt-0 sm:inline">
+              Pick all that apply, or leave blank if none.
+            </span>
+          </legend>
+          <WindowPicker
+            name="removalWindows"
+            selected={values.removalWindows}
           />
-          <span>Not sure if I have old tint</span>
-        </label>
-        <FieldError message={errors.removalWindows} />
-      </fieldset>
+          <label className="mt-3 flex items-center gap-3 py-1 text-sm text-zinc-300 group-has-[input[name=removalWindows]:checked]:hidden">
+            <input
+              type="checkbox"
+              name="removalNotSure"
+              defaultChecked={values.removalNotSure === "on"}
+              className="size-5 shrink-0 accent-red-500 sm:size-4"
+            />
+            <span>Not sure if I have old tint</span>
+          </label>
+          <FieldError message={errors.removalWindows} />
+        </fieldset>
+
+        <div className="relative hidden group-has-[input[name=removalWindows]:checked]/removal:block">
+          <label htmlFor="oldTintCondition" className={labelClass}>
+            Old Tint Condition <span className="text-red-500">*</span>
+          </label>
+          <select
+            key={String(values.oldTintCondition ?? "")}
+            id="oldTintCondition"
+            name="oldTintCondition"
+            defaultValue={values.oldTintCondition ?? ""}
+            className={`${inputClass} appearance-none pr-10 invalid:text-zinc-500`}
+            required
+          >
+            <option value="" disabled>
+              Select
+            </option>
+            {oldTintConditions.map((condition) => {
+              return (
+                <option
+                  key={condition.value}
+                  value={condition.value}
+                  className="text-zinc-100"
+                >
+                  {condition.label}
+                </option>
+              );
+            })}
+          </select>
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400"
+          >
+            <path
+              fillRule="evenodd"
+              d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+              clipRule="evenodd"
+            />
+          </svg>
+        </div>
+        <FieldError message={errors.oldTintCondition} />
+      </div>
 
       <div>
         <label htmlFor="comment" className={labelClass}>

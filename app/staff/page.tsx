@@ -1,15 +1,6 @@
-import Link from "next/link";
 import { Suspense } from "react";
 import { requireStaff } from "../lib/dal";
 import RenderQuote from "./components/RenderQuotes";
-import {
-  filmLabels,
-  formatPhone,
-  sectionLabels,
-  shopDateFormat,
-  sortSections,
-  formatProperNoun,
-} from "../lib/quote";
 
 // Static shell renders instantly; anything reading the session or database streams in behind <Suspense>.
 export default function OpenQuotesPage() {
@@ -31,7 +22,7 @@ async function OpenQuotesList() {
     .from("quote_requests")
     .select(
       `
-      id, created_at, first_name, last_name, phone,
+      id, created_at, first_name, last_name, phone, vehicle_type,
       vehicle_year, vehicle_make, vehicle_model, removal_request, replied_at,
       quotes ( film_type, quote_items ( section ) )
     `,

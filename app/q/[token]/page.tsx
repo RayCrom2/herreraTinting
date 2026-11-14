@@ -8,7 +8,9 @@ import {
   filmLabels,
   formatMinutes,
   formatMoney,
+  sectionLabels,
   sortByFilm,
+  sortBySection,
   formatProperNoun,
 } from "../../lib/quote";
 import { hashQuoteToken, isLinkExpired, TOKEN } from "../../lib/quoteLinks";
@@ -45,14 +47,17 @@ async function CustomerQuote({
   if (!TOKEN.test(token)) notFound();
 
   // Customers aren't logged in, so this reads with the secret key. Select only what the customer
-  // may see: totals per film, never per-window prices or staff notes.
+  // may see: totals and per-window prices for each film, never staff notes.
   // quote_links!inner + the token_hash filter returns only the request this link belongs to.
   const { data: request, error } = await admin
     .from("quote_requests")
     .select(
       `
       first_name, vehicle_year, vehicle_make, vehicle_model,
-      quotes ( id, film_type, total_cost_cents, duration_minutes ),
+      quotes (
+        id, film_type, total_cost_cents, duration_minutes, staff_note,
+        quote_items ( section, install_price_cents, removal_price_cents )
+      ),
       quote_links!inner ( status, expires_at, accepted_quote_id )
     `,
     )
@@ -98,6 +103,11 @@ async function CustomerQuote({
           const name = quote.film_type
             ? filmLabels[quote.film_type]
             : "Tint removal";
+          const items = sortBySection(quote.quote_items);
+          const removalCents = items.reduce(
+            (sum, item) => sum + (item.removal_price_cents ?? 0),
+            0,
+          );
           return (
             <li
               key={quote.id}
@@ -117,6 +127,31 @@ async function CustomerQuote({
               <p className="mt-3 text-sm text-zinc-300">
                 About {formatMinutes(quote.duration_minutes)} in the shop
               </p>
+              <ul className="mt-4 space-y-1 border-t border-zinc-800 pt-3 text-sm text-zinc-300">
+                {items.map((item) => (
+                  <li key={item.section} className="flex justify-between gap-4">
+                    <span>{sectionLabels[item.section]}</span>
+                    <span className="text-right tabular-nums">
+                      {item.install_price_cents !== null &&
+                        formatMoney(item.install_price_cents)}
+                      {item.install_price_cents !== null &&
+                        item.removal_price_cents !== null &&
+                        " + "}
+                      {item.removal_price_cents !== null &&
+                        `${formatMoney(item.removal_price_cents)} removal`}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              {/* A removal-only quote's total is already all removal, so the subtotal would repeat it. */}
+              {quote.film_type && removalCents > 0 && (
+                <p className="mt-2 flex justify-between gap-4 text-sm text-zinc-400">
+                  <span>Removal only</span>
+                  <span className="tabular-nums">
+                    {formatMoney(removalCents)}
+                  </span>
+                </p>
+              )}
               {chosen && (
                 <p className="mt-3 text-sm font-semibold text-emerald-400">
                   ✓ You chose this option

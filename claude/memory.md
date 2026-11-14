@@ -28,8 +28,8 @@ To add the staff check:
 `/q/[token]` (`app/q/[token]/page.tsx`) is the second way into customer data that doesn't need a login, after the public quote form. Whoever holds a link can view that one request's quote. It works like a password-reset link.
 
 - **Lookup uses the secret key.** The page reads with the admin client, so RLS doesn't protect it. The page's own query is the only boundary.
-  - Select only what the customer may see: first name, car, and each quote's `total_cost_cents` / `duration_minutes`.
-  - Never select `quote_items` (per-window prices are private), phone, last name or `staff_note`.
+  - Select only what the customer may see: first name, car, each quote's `total_cost_cents` / `duration_minutes`, and each item's `section` / `install_price_cents` / `removal_price_cents` (for the itemized breakdown).
+  - Never select phone, last name or `staff_note`.
   - Every new field on this page widens what a leaked link exposes.
 - **Only the token's SHA-256 hash is stored** (`quote_links.token_hash`, with a format check). The real token exists only in the link itself: the message sent to the customer, their browser history, clipboards, and server request logs.
 - **Links expire after 14 days.** Staff revoke one by setting `status = 'revoked'`.
