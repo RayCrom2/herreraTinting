@@ -55,12 +55,19 @@ async function QuoteRequestDetail({
 
   const { data: prices, error: pricesError } = await supabase
     .from("prices")
-    .select(
-      `vehicle_type, film_type, section, install_price_cents, install_duration_minutes`,
-    );
+    .select(`vehicle_type, film_type, section, install_price_cents`);
   if (pricesError)
     throw new Error(`Failed to load prices: ${pricesError.message}`);
   if (!prices) notFound();
+
+  const { data: installTimes, error: installTimesError } = await supabase
+    .from("install_times")
+    .select(`vehicle_type, section, install_duration_minutes`);
+  if (installTimesError)
+    throw new Error(
+      `Failed to load install times: ${installTimesError.message}`,
+    );
+  if (!installTimes) notFound();
 
   const quotes: PricingQuote[] = sortByFilm(request.quotes).map((quote) => ({
     id: quote.id,
@@ -117,6 +124,7 @@ async function QuoteRequestDetail({
         customer={{ firstName: request.first_name, phone: request.phone }}
         vehicleType={vehicleType}
         prices={prices}
+        installTimes={installTimes}
       />
     </>
   );

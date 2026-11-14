@@ -161,6 +161,11 @@ export type Price = {
   film_type: string;
   section: string;
   install_price_cents: number;
+};
+
+export type InstallTime = {
+  vehicle_type: string;
+  section: string;
   install_duration_minutes: number;
 };
 

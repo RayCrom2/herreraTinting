@@ -1,13 +1,16 @@
 -- Quote schema v2: quote_requests > quotes > quote_items
 --
--- WARNING: this is a fresh start. It DROPS quote_requests, quotes, quote_items and bookings
--- (if they exist) and everything in them. Only run it while the data is test data.
+-- WARNING: this is a fresh start. It DROPS quote_requests, quotes, quote_items, bookings,
+-- prices and install_times (if they exist) and everything in them, including the price list.
+-- Only run it while the data is test data.
 
 drop table if exists quote_links    cascade;
 drop table if exists bookings       cascade;
 drop table if exists quote_items    cascade;
 drop table if exists quotes         cascade;
 drop table if exists quote_requests cascade;
+drop table if exists prices         cascade;
+drop table if exists install_times  cascade;
 
 -- 1. The customer's request: who they are, their car, their comment
 create table quote_requests (
@@ -333,7 +336,6 @@ create table prices (
                     )),
 
   install_price_cents       int not null check (install_price_cents >= 0),
-  install_duration_minutes  int not null check (install_duration_minutes > 0),
 
   primary key (vehicle_type, film_type, section)
 );
@@ -342,4 +344,22 @@ alter table prices enable row level security;
 grant select on public.prices to authenticated;
 create policy "Staff read prices" on public.prices for select to authenticated using (true);
 
--- 11. Bookings list all bookings made by users on the calendar.
+-- 11. Default install time per vehicle type and window. Time doesn't depend on the film,
+--     so it's stored once here instead of on every film's row in prices.
+create table install_times (
+  vehicle_type      text not null check (vehicle_type in ('coupe', 'sedan', 'suv', 'truck')),
+  section           text not null check (section in (
+                      'windshield', 'sunstrip', 'side-pair',
+                      'rear-windshield', 'sunroof'
+                    )),
+
+  install_duration_minutes  int not null check (install_duration_minutes > 0),
+
+  primary key (vehicle_type, section)
+);
+
+alter table install_times enable row level security;
+grant select on public.install_times to authenticated;
+create policy "Staff read install times" on public.install_times for select to authenticated using (true);
+
+-- 12. Bookings list all bookings made by users on the calendar.

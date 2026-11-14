@@ -17,6 +17,7 @@ import {
   type PricingItem,
   PricingQuote,
   Price,
+  InstallTime,
 } from "../../../lib/quote";
 import CustomerLink, { type Customer } from "./CustomerLink";
 import RecreateLink from "./RecreateLink";
@@ -43,6 +44,7 @@ export default function PricingForm({
   customer,
   vehicleType,
   prices,
+  installTimes,
 }: {
   requestId: string;
   quotes: PricingQuote[];
@@ -50,6 +52,7 @@ export default function PricingForm({
   customer: Customer;
   vehicleType: string | null;
   prices: Price[];
+  installTimes: InstallTime[];
 }) {
   const [state, formAction, isPending] = useActionState(
     savePricing,
@@ -73,22 +76,30 @@ export default function PricingForm({
   const showRemoval = sections.some(needsRemoval);
   const columns = `minmax(0,1fr) ${showRemoval ? "7rem " : ""}${filmQuotes.map(() => "7rem").join(" ")} 5.5rem`;
 
-  // The price list row for a vehicle type, film and window. Front and rear sides share one row.
-  const priceFor = (type: string, film: string, section: string) => {
-    const sectionRef =
-      section === "front-sides" || section === "rear-sides"
-        ? "side-pair"
-        : section;
-    return prices.find(
+  // The price list stores front and rear sides as one row.
+  const listSection = (section: string) =>
+    section === "front-sides" || section === "rear-sides"
+      ? "side-pair"
+      : section;
+
+  // The price list row for a vehicle type, film and window.
+  const priceFor = (type: string, film: string, section: string) =>
+    prices.find(
       (price) =>
         price.vehicle_type === type &&
         price.film_type === film &&
-        price.section === sectionRef,
+        price.section === listSection(section),
     );
-  };
+
+  // The install time for a vehicle type and window. It's the same for every film.
+  const installTimeFor = (type: string, section: string) =>
+    installTimes.find(
+      (time) =>
+        time.vehicle_type === type && time.section === listSection(section),
+    );
 
   // What the price list suggests for a vehicle type, as input strings.
-  // Install is per item; minutes are shared per section, so the first film with a match sets them.
+  // Install is per item; minutes are shared per section.
   function presetValues(type: string | null) {
     const install: Record<string, string> = {}; // item.id -> price input
     const minutes: Record<string, string> = {}; // section -> minutes input
@@ -98,10 +109,15 @@ export default function PricingForm({
       for (const item of quote.items) {
         if (!item.install) continue;
         const match = priceFor(type, quote.film_type!, item.section);
-        if (!match) continue;
-        install[item.id] = centsToInput(match.install_price_cents);
-        minutes[item.section] ??= String(match.install_duration_minutes);
+        if (match) install[item.id] = centsToInput(match.install_price_cents);
       }
+    }
+    // Only windows getting new tint take an install time; removal-only windows are timed by hand.
+    for (const section of sections) {
+      if (!savedItems.some((item) => item.section === section && item.install))
+        continue;
+      const time = installTimeFor(type, section);
+      if (time) minutes[section] = String(time.install_duration_minutes);
     }
     return { install, minutes };
   }
