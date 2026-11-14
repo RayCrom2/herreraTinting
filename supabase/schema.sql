@@ -328,8 +328,8 @@ create table prices (
   vehicle_type      text not null check (vehicle_type in ('coupe', 'sedan', 'suv', 'truck')),
   film_type         text not null check (film_type in ('c2-carbon', 'pronano-ceramic')),
   section           text not null check (section in (
-                      'windshield', 'sunstrip', 'front-sides',
-                      'rear-sides', 'rear-windshield', 'sunroof'
+                      'windshield', 'sunstrip', 'side-pair',
+                      'rear-windshield', 'sunroof'
                     )),
 
   install_price_cents       int not null check (install_price_cents >= 0),

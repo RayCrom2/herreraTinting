@@ -4,16 +4,16 @@ import { useState } from "react";
 import { vehicleTypes } from "@/app/lib/quote";
 
 interface VehicleTypePresetProps {
-  currentType: string | null;
+  value: string | null;
+  onChange: (type: string) => void;
   locked: boolean;
 }
 
 export default function VehicleTypePreset({
-  currentType,
+  value,
+  onChange,
   locked,
 }: VehicleTypePresetProps) {
-  const [preset, setPreset] = useState(currentType);
-
   return (
     <div className="ml-auto">
       <label
@@ -27,8 +27,8 @@ export default function VehicleTypePreset({
           className="appearance-none rounded-xl border border-zinc-800 bg-black p-2 pr-10 text-zinc-100 focus:border-red-500 focus:outline-none"
           id="selectVehicleType"
           disabled={locked}
-          value={preset ?? ""}
-          onChange={(e) => setPreset(e.target.value)}
+          value={value ?? ""}
+          onChange={(e) => onChange(e.target.value)}
         >
           <option value="" disabled>
             Select

@@ -10,7 +10,6 @@ import {
   formatProperNoun,
 } from "../../../lib/quote";
 import PricingForm from "./PricingForm";
-import VehicleTypePreset from "./VehicleTypePreset";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -51,9 +50,17 @@ async function QuoteRequestDetail({
     )
     .eq("id", requestId)
     .maybeSingle();
-
   if (error) throw new Error(`Failed to load quote request: ${error.message}`);
   if (!request) notFound();
+
+  const { data: prices, error: pricesError } = await supabase
+    .from("prices")
+    .select(
+      `vehicle_type, film_type, section, install_price_cents, install_duration_minutes`,
+    );
+  if (pricesError)
+    throw new Error(`Failed to load prices: ${pricesError.message}`);
+  if (!prices) notFound();
 
   const quotes: PricingQuote[] = sortByFilm(request.quotes).map((quote) => ({
     id: quote.id,
@@ -87,9 +94,6 @@ async function QuoteRequestDetail({
             <p className="text-sm text-zinc-400">
               Received {shopDateFormat.format(new Date(request.created_at))}
             </p>
-            <div className="absolute right-0 top-0">
-              <VehicleTypePreset currentType={vehicleType} locked={locked} />
-            </div>
           </div>
 
           {request.comment && (
@@ -112,6 +116,7 @@ async function QuoteRequestDetail({
         locked={locked}
         customer={{ firstName: request.first_name, phone: request.phone }}
         vehicleType={vehicleType}
+        prices={prices}
       />
     </>
   );

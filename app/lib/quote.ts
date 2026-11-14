@@ -156,6 +156,15 @@ export type Request = {
  }[],
 };
 
+export type Price = {
+  vehicle_type: string;
+  film_type: string;
+  section: string;
+  install_price_cents: number;
+  install_duration_minutes: number;
+};
+
+
 export const vehicleTypes = [
   {
     value: "coupe",

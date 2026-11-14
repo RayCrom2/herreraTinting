@@ -15,10 +15,12 @@ import {
   sortSections,
   fieldName,
   type PricingItem,
-  type PricingQuote,
+  PricingQuote,
+  Price,
 } from "../../../lib/quote";
 import CustomerLink, { type Customer } from "./CustomerLink";
 import RecreateLink from "./RecreateLink";
+import VehicleTypePreset from "./VehicleTypePreset";
 
 const inputClass =
   "w-full rounded-lg border bg-black px-3 py-2 text-right text-zinc-100 tabular-nums focus:border-red-500 focus:outline-none disabled:opacity-60";
@@ -40,12 +42,14 @@ export default function PricingForm({
   locked,
   customer,
   vehicleType,
+  prices,
 }: {
   requestId: string;
   quotes: PricingQuote[];
   locked: boolean;
   customer: Customer;
   vehicleType: string | null;
+  prices: Price[];
 }) {
   const [state, formAction, isPending] = useActionState(
     savePricing,
@@ -54,6 +58,8 @@ export default function PricingForm({
 
   // Every window on the request, front to back, and which quote's item covers it.
   const savedItems = quotes.flatMap((quote) => quote.items);
+  const [preset, setPreset] = useState(vehicleType);
+
   const sections = sortSections([
     ...new Set(savedItems.map((item) => item.section)),
   ]);
@@ -67,9 +73,43 @@ export default function PricingForm({
   const showRemoval = sections.some(needsRemoval);
   const columns = `minmax(0,1fr) ${showRemoval ? "7rem " : ""}${filmQuotes.map(() => "7rem").join(" ")} 5.5rem`;
 
-  // Controlled so totals update as staff type. Shared values start from the first saved item.
-  const [sectionInputs, setSectionInputs] = useState<SectionInputs>(() =>
-    Object.fromEntries(
+  // The price list row for a vehicle type, film and window. Front and rear sides share one row.
+  const priceFor = (type: string, film: string, section: string) => {
+    const sectionRef =
+      section === "front-sides" || section === "rear-sides"
+        ? "side-pair"
+        : section;
+    return prices.find(
+      (price) =>
+        price.vehicle_type === type &&
+        price.film_type === film &&
+        price.section === sectionRef,
+    );
+  };
+
+  // What the price list suggests for a vehicle type, as input strings.
+  // Install is per item; minutes are shared per section, so the first film with a match sets them.
+  function presetValues(type: string | null) {
+    const install: Record<string, string> = {}; // item.id -> price input
+    const minutes: Record<string, string> = {}; // section -> minutes input
+    if (!type) return { install, minutes };
+
+    for (const quote of filmQuotes) {
+      for (const item of quote.items) {
+        if (!item.install) continue;
+        const match = priceFor(type, quote.film_type!, item.section);
+        if (!match) continue;
+        install[item.id] = centsToInput(match.install_price_cents);
+        minutes[item.section] ??= String(match.install_duration_minutes);
+      }
+    }
+    return { install, minutes };
+  }
+
+  // Controlled so totals update as staff type. Saved values win; empty ones start from the price list.
+  const [sectionInputs, setSectionInputs] = useState<SectionInputs>(() => {
+    const preset = presetValues(vehicleType);
+    return Object.fromEntries(
       sections.map((section) => {
         const first = savedItems.find((item) => item.section === section)!;
         return [
@@ -77,19 +117,42 @@ export default function PricingForm({
           {
             removal_price: centsToInput(first.removal_price_cents),
             minutes:
-              first.duration_minutes === null
-                ? ""
-                : String(first.duration_minutes),
+              first.duration_minutes !== null
+                ? String(first.duration_minutes)
+                : (preset.minutes[section] ?? ""),
           },
         ];
       }),
-    ),
-  );
-  const [installInputs, setInstallInputs] = useState<InstallInputs>(() =>
-    Object.fromEntries(
-      savedItems.map((item) => [item.id, centsToInput(item.install_price_cents)]),
-    ),
-  );
+    );
+  });
+  const [installInputs, setInstallInputs] = useState<InstallInputs>(() => {
+    const preset = presetValues(vehicleType);
+    return Object.fromEntries(
+      savedItems.map((item) => [
+        item.id,
+        item.install_price_cents !== null
+          ? centsToInput(item.install_price_cents)
+          : (preset.install[item.id] ?? ""),
+      ]),
+    );
+  });
+
+  // Picking a type overwrites install prices and minutes with the price list.
+  // Anything without a matching row keeps whatever is already typed.
+  function applyPreset(type: string) {
+    setPreset(type);
+    const next = presetValues(type);
+
+    setInstallInputs((current) => ({ ...current, ...next.install }));
+    setSectionInputs((current) =>
+      Object.fromEntries(
+        Object.entries(current).map(([section, inputs]) => [
+          section,
+          { ...inputs, minutes: next.minutes[section] ?? inputs.minutes },
+        ]),
+      ),
+    );
+  }
 
   const [sendState, sendAction, isSending] = useActionState(
     sendQuote,
@@ -167,19 +230,6 @@ export default function PricingForm({
     else event.currentTarget.requestSubmit();
   }
 
-  // Each quote's total: its own install prices plus the shared removal and minutes.
-  // const totals = quotes.map((quote) => {
-  //   let cents = 0;
-  //   let minutes = 0;
-  //   for (const item of quote.items) {
-  //     const now = typed(item);
-  //     if (now.install !== null && !Number.isNaN(now.install)) cents += now.install;
-  //     if (now.removal !== null && !Number.isNaN(now.removal)) cents += now.removal;
-  //     if (now.minutes !== null && !Number.isNaN(now.minutes)) minutes += now.minutes;
-  //   }
-  //   return { quote, cents, minutes };
-  // });
-
   // Removal and minutes are shared across films, so they're summed once per window (not per quote).
   // Install prices differ per film, so each film quote gets its own total.
   const totals = {
@@ -190,9 +240,12 @@ export default function PricingForm({
 
   // Shared values: once per window, so "Both" doesn't double them and Removal Only still counts.
   for (const section of sections) {
-    const removal = needsRemoval(section) ? dollarsToCents(sectionInputs[section].removal_price) : null;
+    const removal = needsRemoval(section)
+      ? dollarsToCents(sectionInputs[section].removal_price)
+      : null;
     const minutes = parseMinutes(sectionInputs[section].minutes);
-    if (removal !== null && !Number.isNaN(removal)) totals.removalCents += removal;
+    if (removal !== null && !Number.isNaN(removal))
+      totals.removalCents += removal;
     if (minutes !== null && !Number.isNaN(minutes)) totals.minutes += minutes;
   }
 
@@ -200,11 +253,11 @@ export default function PricingForm({
     let cents = totals.removalCents; // every film quote includes the same removal work
     for (const item of quote.items) {
       const now = typed(item);
-      if (now.install !== null && !Number.isNaN(now.install)) cents += now.install;
+      if (now.install !== null && !Number.isNaN(now.install))
+        cents += now.install;
     }
     totals.filmCents[quote.film_type!] = cents;
   }
-
 
   function priceInput(
     name: string,
@@ -231,196 +284,217 @@ export default function PricingForm({
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      onKeyDown={handleKeyDown}
-      className="mt-8 space-y-6"
-    >
-      <input type="hidden" name="requestId" value={requestId} />
+    <div>
+      <VehicleTypePreset
+        value={preset}
+        onChange={applyPreset}
+        locked={locked}
+      />
 
-      <fieldset
-        disabled={locked || isPending}
-        style={{ "--price-cols": columns } as React.CSSProperties}
-        className="rounded-xl border border-zinc-800 bg-zinc-950 p-4"
+      <form
+        onSubmit={handleSubmit}
+        onKeyDown={handleKeyDown}
+        className="mt-8 space-y-6"
       >
-        {/* Mobile: each window is its own stacked block. Desktop: one table-like grid. */}
-        <div className="grid grid-cols-1 items-start gap-y-5 md:grid-cols-(--price-cols) md:items-end md:gap-x-3 md:gap-y-3">
-          <span className="hidden pl-2 text-xs font-semibold uppercase tracking-wide text-zinc-500 md:block">
-            Window
-          </span>
-          {showRemoval && <span className={headerClass}>Removal ($)</span>}
-          {filmQuotes.map((quote) => (
-            <span key={quote.id} className={headerClass}>
-              {filmLabels[quote.film_type!]} ($)
+        <input type="hidden" name="requestId" value={requestId} />
+
+        <fieldset
+          disabled={locked || isPending}
+          style={{ "--price-cols": columns } as React.CSSProperties}
+          className="rounded-xl border border-zinc-800 bg-zinc-950 p-4"
+        >
+          {/* Mobile: each window is its own stacked block. Desktop: one table-like grid. */}
+          <div className="grid grid-cols-1 items-start gap-y-5 md:grid-cols-(--price-cols) md:items-end md:gap-x-3 md:gap-y-3">
+            <span className="hidden pl-2 text-xs font-semibold uppercase tracking-wide text-zinc-500 md:block">
+              Window
             </span>
-          ))}
-          <span className={headerClass}>Minutes</span>
+            {showRemoval && <span className={headerClass}>Removal ($)</span>}
+            {filmQuotes.map((quote) => (
+              <span key={quote.id} className={headerClass}>
+                {filmLabels[quote.film_type!]} ($)
+              </span>
+            ))}
+            <span className={headerClass}>Minutes</span>
 
-          {sections.map((section) => {
-            const label = sectionLabels[section];
-            const minutesName = fieldName("minutes", section);
-            const minutesError = state.errors[minutesName];
+            {sections.map((section) => {
+              const label = sectionLabels[section];
+              const minutesName = fieldName("minutes", section);
+              const minutesError = state.errors[minutesName];
 
-            return (
-              <div
-                key={section}
-                className="grid grid-cols-2 gap-x-3 gap-y-2 md:contents"
-              >
-                <p className="col-span-2 font-medium md:col-span-1 md:self-start md:pt-2">
-                  {label}
-                </p>
+              return (
+                <div
+                  key={section}
+                  className="grid grid-cols-2 gap-x-3 gap-y-2 md:contents"
+                >
+                  <p className="col-span-2 font-medium md:col-span-1 md:self-start md:pt-2">
+                    {label}
+                  </p>
 
-                {/* Empty cells keep the desktop columns lined up; on mobile they're dropped. */}
-                {showRemoval &&
-                  (needsRemoval(section) ? (
-                    <div className="md:self-start">
-                      <span aria-hidden className={mobileLabelClass}>
-                        Removal ($)
-                      </span>
-                      {priceInput(
-                        fieldName("removal_price", section),
-                        `${label} removal price`,
-                        sectionInputs[section].removal_price,
-                        (value) => setSectionInput(section, "removal_price", value),
-                      )}
-                    </div>
-                  ) : (
-                    <div aria-hidden className="hidden md:block" />
-                  ))}
+                  {/* Empty cells keep the desktop columns lined up; on mobile they're dropped. */}
+                  {showRemoval &&
+                    (needsRemoval(section) ? (
+                      <div className="md:self-start">
+                        <span aria-hidden className={mobileLabelClass}>
+                          Removal ($)
+                        </span>
+                        {priceInput(
+                          fieldName("removal_price", section),
+                          `${label} removal price`,
+                          sectionInputs[section].removal_price,
+                          (value) =>
+                            setSectionInput(section, "removal_price", value),
+                        )}
+                      </div>
+                    ) : (
+                      <div aria-hidden className="hidden md:block" />
+                    ))}
 
-                {filmQuotes.map((quote) => {
-                  const item = itemFor(quote, section);
-                  if (!item?.install) {
-                    return (
-                      <div key={quote.id} aria-hidden className="hidden md:block" />
-                    );
-                  }
-                  const film = filmLabels[quote.film_type!];
-                  return (
-                    <div key={quote.id} className="md:self-start">
-                      <span aria-hidden className={mobileLabelClass}>
-                        {film} ($)
-                      </span>
-                      {priceInput(
-                        fieldName("install_price", item.id),
-                        `${label} ${film} price`,
-                        installInputs[item.id],
-                        (value) =>
-                          setInstallInputs((current) => ({
-                            ...current,
-                            [item.id]: value,
-                          })),
-                      )}
-                    </div>
-                  );
-                })}
-
-                <div className="md:self-start">
-                  <span aria-hidden className={mobileLabelClass}>
-                    Minutes
-                  </span>
-                  <input
-                    name={minutesName}
-                    inputMode="numeric"
-                    enterKeyHint="next"
-                    placeholder="0"
-                    aria-label={`${label} minutes`}
-                    value={sectionInputs[section].minutes}
-                    onChange={(e) =>
-                      setSectionInput(section, "minutes", e.target.value)
+                  {filmQuotes.map((quote) => {
+                    const item = itemFor(quote, section);
+                    if (!item?.install) {
+                      return (
+                        <div
+                          key={quote.id}
+                          aria-hidden
+                          className="hidden md:block"
+                        />
+                      );
                     }
-                    className={`${inputClass} ${minutesError ? "border-red-500" : "border-zinc-800"}`}
-                  />
-                  {minutesError && (
-                    <p className="mt-1 text-xs text-red-400">{minutesError}</p>
-                  )}
+                    const film = filmLabels[quote.film_type!];
+                    return (
+                      <div key={quote.id} className="md:self-start">
+                        <span aria-hidden className={mobileLabelClass}>
+                          {film} ($)
+                        </span>
+                        {priceInput(
+                          fieldName("install_price", item.id),
+                          `${label} ${film} price`,
+                          installInputs[item.id],
+                          (value) =>
+                            setInstallInputs((current) => ({
+                              ...current,
+                              [item.id]: value,
+                            })),
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  <div className="md:self-start">
+                    <span aria-hidden className={mobileLabelClass}>
+                      Minutes
+                    </span>
+                    <input
+                      name={minutesName}
+                      inputMode="numeric"
+                      enterKeyHint="next"
+                      placeholder="0"
+                      aria-label={`${label} minutes`}
+                      value={sectionInputs[section].minutes}
+                      onChange={(e) =>
+                        setSectionInput(section, "minutes", e.target.value)
+                      }
+                      className={`${inputClass} ${minutesError ? "border-red-500" : "border-zinc-800"}`}
+                    />
+                    {minutesError && (
+                      <p className="mt-1 text-xs text-red-400">
+                        {minutesError}
+                      </p>
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Totals line up under their columns. A film's total already includes removal,
-            so the removal cell only shows a number when removal is the whole job. */}
-        <div className="mt-4 grid grid-cols-1 gap-y-1 border-t border-zinc-800 pt-3 md:grid-cols-(--price-cols) md:gap-x-3">
-          <span className="font-semibold md:pl-2">Total</span>
-
-          {showRemoval &&
-            <TotalCell label="Removal Only" value={formatMoney(totals.removalCents)} />}
-
-          {filmQuotes.map((quote) => (
-            <TotalCell
-              key={quote.id}
-              label={filmLabels[quote.film_type!]}
-              value={formatMoney(totals.filmCents[quote.film_type!])}
-            />
-          ))}
-
-          <TotalCell
-            label="Time"
-            value={totals.minutes > 0 ? `${formatMinutes(totals.minutes)}` : "—"}
-          />
-        </div>
-      </fieldset>
-
-      {!locked && (
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="submit"
-              disabled={isPending || isSending}
-              className="w-full rounded-full bg-red-600 px-6 py-3 md:w-auto font-bold text-white transition-colors hover:bg-red-500 disabled:opacity-60"
-            >
-              {isPending ? "Saving..." : "Save prices"}
-            </button>
-            <button
-              type="button"
-              onClick={handleSend}
-              disabled={
-                !fullyPriced || hasUnsavedChanges || isPending || isSending
-              }
-              className="w-full rounded-full border border-zinc-500 px-6 py-3 md:w-auto font-bold text-zinc-100 transition-colors hover:border-zinc-300 disabled:opacity-40"
-            >
-              {isSending ? "Sending..." : "Send quote"}
-            </button>
+              );
+            })}
           </div>
-          {hasUnsavedChanges ? (
-            <p className="text-sm text-zinc-400">
-              Save your changes before sending.
-            </p>
-          ) : (
-            !fullyPriced && (
-              <p className="text-sm text-zinc-400">
-                Every window needs a price and time to send.
-              </p>
-            )
-          )}
-          {state.message && (
-            <p
-              role="status"
-              className={`text-sm ${state.status === "error" ? "text-red-400" : "text-emerald-400"}`}
-            >
-              {state.message}
-            </p>
-          )}
-        </div>
-      )}
 
-      {sendState.status === "error" && (
-        <p role="alert" className="text-sm text-red-400">
-          {sendState.message}
-        </p>
-      )}
-      {sendState.url ? (
-        <CustomerLink
-          url={sendState.url}
-          message={sendState.message}
-          customer={customer}
-        />
-      ) : (
-        locked && <RecreateLink requestId={requestId} customer={customer} />
-      )}
-    </form>
+          {/* Totals line up under their columns. A film's total already includes removal,
+            so the removal cell only shows a number when removal is the whole job. */}
+          <div className="mt-4 grid grid-cols-1 gap-y-1 border-t border-zinc-800 pt-3 md:grid-cols-(--price-cols) md:gap-x-3">
+            <span className="font-semibold md:pl-2">Total</span>
+
+            {showRemoval && (
+              <TotalCell
+                label="Removal Only"
+                value={formatMoney(totals.removalCents)}
+              />
+            )}
+
+            {filmQuotes.map((quote) => (
+              <TotalCell
+                key={quote.id}
+                label={filmLabels[quote.film_type!]}
+                value={formatMoney(totals.filmCents[quote.film_type!])}
+              />
+            ))}
+
+            <TotalCell
+              label="Time"
+              value={
+                totals.minutes > 0 ? `${formatMinutes(totals.minutes)}` : "—"
+              }
+            />
+          </div>
+        </fieldset>
+
+        {!locked && (
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="submit"
+                disabled={isPending || isSending}
+                className="w-full rounded-full bg-red-600 px-6 py-3 md:w-auto font-bold text-white transition-colors hover:bg-red-500 disabled:opacity-60"
+              >
+                {isPending ? "Saving..." : "Save prices"}
+              </button>
+              <button
+                type="button"
+                onClick={handleSend}
+                disabled={
+                  !fullyPriced || hasUnsavedChanges || isPending || isSending
+                }
+                className="w-full rounded-full border border-zinc-500 px-6 py-3 md:w-auto font-bold text-zinc-100 transition-colors hover:border-zinc-300 disabled:opacity-40"
+              >
+                {isSending ? "Sending..." : "Send quote"}
+              </button>
+            </div>
+            {hasUnsavedChanges ? (
+              <p className="text-sm text-zinc-400">
+                Save your changes before sending.
+              </p>
+            ) : (
+              !fullyPriced && (
+                <p className="text-sm text-zinc-400">
+                  Every window needs a price and time to send.
+                </p>
+              )
+            )}
+            {state.message && (
+              <p
+                role="status"
+                className={`text-sm ${state.status === "error" ? "text-red-400" : "text-emerald-400"}`}
+              >
+                {state.message}
+              </p>
+            )}
+          </div>
+        )}
+
+        {sendState.status === "error" && (
+          <p role="alert" className="text-sm text-red-400">
+            {sendState.message}
+          </p>
+        )}
+        {sendState.url ? (
+          <CustomerLink
+            url={sendState.url}
+            message={sendState.message}
+            customer={customer}
+          />
+        ) : (
+          locked && <RecreateLink requestId={requestId} customer={customer} />
+        )}
+      </form>
+    </div>
   );
 }
 
