@@ -55,7 +55,7 @@ async function CustomerQuote({
       `
       first_name, vehicle_year, vehicle_make, vehicle_model,
       quotes (
-        id, film_type, total_cost_cents, duration_minutes,
+        id, film_type, total_cost_cents, duration_minutes, staff_note,
         quote_items ( section, install_price_cents, removal_price_cents )
       ),
       quote_links!inner ( status, expires_at, accepted_quote_id )
@@ -129,10 +129,7 @@ async function CustomerQuote({
               </p>
               <ul className="mt-4 space-y-1 border-t border-zinc-800 pt-3 text-sm text-zinc-300">
                 {items.map((item) => (
-                  <li
-                    key={item.section}
-                    className="flex justify-between gap-4"
-                  >
+                  <li key={item.section} className="flex justify-between gap-4">
                     <span>{sectionLabels[item.section]}</span>
                     <span className="text-right tabular-nums">
                       {item.install_price_cents !== null &&

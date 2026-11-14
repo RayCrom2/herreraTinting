@@ -363,3 +363,44 @@ grant select on public.install_times to authenticated;
 create policy "Staff read install times" on public.install_times for select to authenticated using (true);
 
 -- 12. Bookings list all bookings made by users on the calendar.
+
+-- 13. Keeps quotes.total_cost_cents and quotes.duration_minutes in sync with their items.
+--     Runs inside the same statement as the item update, so they save together or not at all.
+create or replace function public.recalc_quote_totals()
+returns trigger
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+begin
+  update public.quotes q
+  set
+    -- sum() skips nulls and is null only when every value is null, so a quote with
+    -- no prices stays null. coalesce picks the first non-null: both sums added, else
+    -- whichever one exists, else null.
+    total_cost_cents = coalesce(t.install_sum + t.removal_sum, t.install_sum, t.removal_sum),
+    duration_minutes = t.minutes_sum
+  from (
+    -- One row per changed quote, with each sum computed once.
+    select
+      i.quote_id,
+      sum(i.install_price_cents) as install_sum,
+      sum(i.removal_price_cents) as removal_sum,
+      sum(i.duration_minutes)    as minutes_sum
+    from public.quote_items i
+    where i.quote_id in (select quote_id from changed_items)
+    group by i.quote_id
+  ) t
+  where q.id = t.quote_id;
+
+  return null;  -- the return value is ignored for AFTER ... FOR EACH STATEMENT triggers
+end;
+$$;
+
+-- Only UPDATE: new items start with null prices, so inserts never change a total.
+-- savePricing's upsert hits existing rows, which fires this as an update.
+create trigger quote_items_recalc_totals
+after update on public.quote_items
+referencing new table as changed_items
+for each statement
+execute function public.recalc_quote_totals();

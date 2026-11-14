@@ -18,6 +18,7 @@ import {
   PricingQuote,
   Price,
   InstallTime,
+  oldTintConditions,
 } from "../../../lib/quote";
 import CustomerLink, { type Customer } from "./CustomerLink";
 import RecreateLink from "./RecreateLink";
@@ -26,8 +27,16 @@ import VehicleTypePreset from "./VehicleTypePreset";
 const inputClass =
   "w-full rounded-lg border bg-black px-3 py-2 text-right text-zinc-100 tabular-nums focus:border-red-500 focus:outline-none disabled:opacity-60";
 const headerClass =
-  "hidden text-right text-xs font-semibold uppercase tracking-wide text-zinc-500 md:block";
-const mobileLabelClass = "mb-1 block text-xs text-zinc-500 md:hidden";
+  "hidden text-right text-xs font-semibold uppercase tracking-wide md:block";
+const mobileLabelClass = "mb-1 block text-xs md:hidden";
+
+// One color per column, shared by the desktop headers, mobile labels and totals.
+const filmColors: Record<string, string> = {
+  "c2-carbon": "text-blue-400",
+  "pronano-ceramic": "text-orange-400",
+};
+const removalColor = "text-rose-300";
+const minutesColor = "text-zinc-300";
 
 // Removal price and minutes don't depend on the film, so they're typed once per window (section).
 // Install price is per film, so it's typed per item.
@@ -37,6 +46,24 @@ type InstallInputs = Record<string, string>;
 const centsToInput = (cents: number | null) =>
   cents === null ? "" : (cents / 100).toFixed(2);
 
+// `color` tints the label (mobile) and the number, so each total matches its column header.
+function TotalCell({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: string;
+  color: string;
+}) {
+  return (
+    <div className="flex items-baseline justify-between md:block md:text-right">
+      <span className={`text-sm md:hidden ${color}`}>{label}</span>
+      <span className={`font-bold tabular-nums ${color}`}>{value}</span>
+    </div>
+  );
+}
+
 export default function PricingForm({
   requestId,
   quotes,
@@ -45,6 +72,8 @@ export default function PricingForm({
   vehicleType,
   prices,
   installTimes,
+  currentCondition,
+  staffNote,
 }: {
   requestId: string;
   quotes: PricingQuote[];
@@ -53,41 +82,53 @@ export default function PricingForm({
   vehicleType: string | null;
   prices: Price[];
   installTimes: InstallTime[];
+  currentCondition: string | null;
+  staffNote: string;
 }) {
   const [state, formAction, isPending] = useActionState(
     savePricing,
     initialPricingState,
   );
+  const [sendState, sendAction, isSending] = useActionState(
+    sendQuote,
+    initialSendState,
+  );
 
   // Every window on the request, front to back, and which quote's item covers it.
   const savedItems = quotes.flatMap((quote) => quote.items);
   const [preset, setPreset] = useState(vehicleType);
+  const [noteInput, setNoteInput] = useState(staffNote);
 
+  //one list of the window sections for the quote without duplicates
   const sections = sortSections([
     ...new Set(savedItems.map((item) => item.section)),
   ]);
+
   const itemFor = (quote: PricingQuote, section: string) =>
     quote.items.find((item) => item.section === section);
   const needsRemoval = (section: string) =>
     savedItems.some((item) => item.section === section && item.removal);
 
-  // Columns: removal (if any window has it), one install column per film, then minutes.
+  // Columns: one install column per film (C2, then ProNano), removal (if any window has it), then minutes.
   const filmQuotes = quotes.filter((quote) => quote.film_type !== null);
   const showRemoval = sections.some(needsRemoval);
-  const columns = `minmax(0,1fr) ${showRemoval ? "7rem " : ""}${filmQuotes.map(() => "7rem").join(" ")} 5.5rem`;
+  const columns = `minmax(0,1fr) ${filmQuotes.map(() => "7rem ").join("")}${showRemoval ? "7rem " : ""}5.5rem`;
 
   // The price list stores front and rear sides as one row.
   const listSection = (section: string) =>
     section === "front-sides" || section === "rear-sides"
       ? "side-pair"
       : section;
+  // Only c2-carbon film is available for sunstrip
+  const listFilm = (film: string, section: string) =>
+    section === "sunstrip" ? "c2-carbon" : film;
 
   // The price list row for a vehicle type, film and window.
   const priceFor = (type: string, film: string, section: string) =>
     prices.find(
       (price) =>
         price.vehicle_type === type &&
-        price.film_type === film &&
+        price.film_type === listFilm(film, section) &&
         price.section === listSection(section),
     );
 
@@ -170,11 +211,6 @@ export default function PricingForm({
     );
   }
 
-  const [sendState, sendAction, isSending] = useActionState(
-    sendQuote,
-    initialSendState,
-  );
-
   // What a saved item would become if the typed values were saved now.
   function typed(item: PricingItem) {
     return {
@@ -188,14 +224,16 @@ export default function PricingForm({
 
   // `quotes` holds what's saved in the database (it refreshes after each save);
   // the inputs hold what's typed. Sending uses the saved prices, so both must agree first.
-  const hasUnsavedChanges = savedItems.some((item) => {
-    const now = typed(item);
-    return (
-      now.install !== item.install_price_cents ||
-      now.removal !== item.removal_price_cents ||
-      now.minutes !== item.duration_minutes
-    );
-  });
+  const hasUnsavedChanges =
+    noteInput.trim() !== staffNote ||
+    savedItems.some((item) => {
+      const now = typed(item);
+      return (
+        now.install !== item.install_price_cents ||
+        now.removal !== item.removal_price_cents ||
+        now.minutes !== item.duration_minutes
+      );
+    });
   const fullyPriced = savedItems.every(
     (item) =>
       (!item.install || item.install_price_cents !== null) &&
@@ -301,16 +339,35 @@ export default function PricingForm({
 
   return (
     <div>
-      <VehicleTypePreset
-        value={preset}
-        onChange={applyPreset}
-        locked={locked}
-      />
+      <div className="flex items-end gap-4">
+        {currentCondition &&
+          (() => {
+            const condition = oldTintConditions.find(
+              (c) => c.value === currentCondition,
+            );
+            return (
+              <p className="text-base text-zinc-300">
+                Old tint condition:{" "}
+                <span className={condition?.color}>
+                  {condition?.label ?? currentCondition}
+                </span>
+              </p>
+            );
+          })()}
+        {/* In normal flow (not absolute) so it pushes the form down instead of overlapping it. */}
+        <div className="ml-auto justify-end">
+          <VehicleTypePreset
+            value={preset}
+            onChange={applyPreset}
+            locked={locked}
+          />
+        </div>
+      </div>
 
       <form
         onSubmit={handleSubmit}
         onKeyDown={handleKeyDown}
-        className="mt-8 space-y-6"
+        className="mt-3 space-y-6"
       >
         <input type="hidden" name="requestId" value={requestId} />
 
@@ -320,19 +377,26 @@ export default function PricingForm({
           className="rounded-xl border border-zinc-800 bg-zinc-950 p-4"
         >
           {/* Mobile: each window is its own stacked block. Desktop: one table-like grid. */}
-          <div className="grid grid-cols-1 items-start gap-y-5 md:grid-cols-(--price-cols) md:items-end md:gap-x-3 md:gap-y-3">
+          <div className="grid grid-cols-1 items-start gap-y-5 md:grid-cols-(--price-cols) md:items-end md:gap-x-3 md:gap-y-0">
             <span className="hidden pl-2 text-xs font-semibold uppercase tracking-wide text-zinc-500 md:block">
               Window
             </span>
-            {showRemoval && <span className={headerClass}>Removal ($)</span>}
             {filmQuotes.map((quote) => (
-              <span key={quote.id} className={headerClass}>
+              <span
+                key={quote.id}
+                className={`${headerClass} ${filmColors[quote.film_type!]}`}
+              >
                 {filmLabels[quote.film_type!]} ($)
               </span>
             ))}
-            <span className={headerClass}>Minutes</span>
+            {showRemoval && (
+              <span className={`${headerClass} ${removalColor}`}>
+                Removal ($)
+              </span>
+            )}
+            <span className={`${headerClass} ${minutesColor}`}>Minutes</span>
 
-            {sections.map((section) => {
+            {sections.map((section, idx) => {
               const label = sectionLabels[section];
               const minutesName = fieldName("minutes", section);
               const minutesError = state.errors[minutesName];
@@ -340,31 +404,13 @@ export default function PricingForm({
               return (
                 <div
                   key={section}
-                  className="grid grid-cols-2 gap-x-3 gap-y-2 md:contents"
+                  className={`grid grid-cols-2 gap-x-3 max-md:px-2 gap-y-2 rounded-lg py-2 md:col-span-full md:grid-cols-subgrid ${idx % 2 === 0 ? "max-md:bg-zinc-900" : ""}`}
                 >
-                  <p className="col-span-2 font-medium md:col-span-1 md:self-start md:pt-2">
+                  <p className="col-span-2 font-bold md:col-span-1 md:self-start md:pt-2">
                     {label}
                   </p>
 
                   {/* Empty cells keep the desktop columns lined up; on mobile they're dropped. */}
-                  {showRemoval &&
-                    (needsRemoval(section) ? (
-                      <div className="md:self-start">
-                        <span aria-hidden className={mobileLabelClass}>
-                          Removal ($)
-                        </span>
-                        {priceInput(
-                          fieldName("removal_price", section),
-                          `${label} removal price`,
-                          sectionInputs[section].removal_price,
-                          (value) =>
-                            setSectionInput(section, "removal_price", value),
-                        )}
-                      </div>
-                    ) : (
-                      <div aria-hidden className="hidden md:block" />
-                    ))}
-
                   {filmQuotes.map((quote) => {
                     const item = itemFor(quote, section);
                     if (!item?.install) {
@@ -379,7 +425,10 @@ export default function PricingForm({
                     const film = filmLabels[quote.film_type!];
                     return (
                       <div key={quote.id} className="md:self-start">
-                        <span aria-hidden className={mobileLabelClass}>
+                        <span
+                          aria-hidden
+                          className={`${mobileLabelClass} ${filmColors[quote.film_type!]}`}
+                        >
                           {film} ($)
                         </span>
                         {priceInput(
@@ -396,8 +445,32 @@ export default function PricingForm({
                     );
                   })}
 
+                  {showRemoval &&
+                    (needsRemoval(section) ? (
+                      <div className="md:self-start">
+                        <span
+                          aria-hidden
+                          className={`${mobileLabelClass} ${removalColor}`}
+                        >
+                          Removal ($)
+                        </span>
+                        {priceInput(
+                          fieldName("removal_price", section),
+                          `${label} removal price`,
+                          sectionInputs[section].removal_price,
+                          (value) =>
+                            setSectionInput(section, "removal_price", value),
+                        )}
+                      </div>
+                    ) : (
+                      <div aria-hidden className="invisible" />
+                    ))}
+
                   <div className="md:self-start">
-                    <span aria-hidden className={mobileLabelClass}>
+                    <span
+                      aria-hidden
+                      className={`${mobileLabelClass} ${minutesColor}`}
+                    >
                       Minutes
                     </span>
                     <input
@@ -428,26 +501,49 @@ export default function PricingForm({
           <div className="mt-4 grid grid-cols-1 gap-y-1 border-t border-zinc-800 pt-3 md:grid-cols-(--price-cols) md:gap-x-3">
             <span className="font-semibold md:pl-2">Total</span>
 
-            {showRemoval && (
-              <TotalCell
-                label="Removal Only"
-                value={formatMoney(totals.removalCents)}
-              />
-            )}
-
             {filmQuotes.map((quote) => (
               <TotalCell
                 key={quote.id}
                 label={filmLabels[quote.film_type!]}
                 value={formatMoney(totals.filmCents[quote.film_type!])}
+                color={filmColors[quote.film_type!]}
               />
             ))}
 
+            {showRemoval && (
+              <TotalCell
+                label="Removal Only"
+                value={formatMoney(totals.removalCents)}
+                color={removalColor}
+              />
+            )}
+
             <TotalCell
               label="Time"
+              color={minutesColor}
               value={
                 totals.minutes > 0 ? `${formatMinutes(totals.minutes)}` : "—"
               }
+            />
+          </div>
+
+          {/* Saved with the prices. A textarea, so Enter adds a line instead of jumping fields. */}
+          <div className="mt-4 border-t border-zinc-800 pt-3">
+            <label
+              htmlFor="staffNote"
+              className="mb-1 block text-sm font-semibold md:pl-2"
+            >
+              Staff note
+            </label>
+            <textarea
+              id="staffNote"
+              name="staffNote"
+              rows={3}
+              maxLength={1000}
+              placeholder="Anything to add to this quote"
+              value={noteInput}
+              onChange={(e) => setNoteInput(e.target.value)}
+              className="w-full rounded-lg border border-zinc-800 bg-black px-3 py-2 text-zinc-100 focus:border-red-500 focus:outline-none disabled:opacity-60"
             />
           </div>
         </fieldset>
@@ -510,15 +606,6 @@ export default function PricingForm({
           locked && <RecreateLink requestId={requestId} customer={customer} />
         )}
       </form>
-    </div>
-  );
-}
-
-function TotalCell({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-baseline justify-between md:block md:text-right">
-      <span className="text-sm text-zinc-400 md:hidden">{label}</span>
-      <span className="font-bold tabular-nums">{value}</span>
     </div>
   );
 }

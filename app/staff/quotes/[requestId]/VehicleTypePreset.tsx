@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { vehicleTypes } from "@/app/lib/quote";
 
 interface VehicleTypePresetProps {
@@ -15,7 +14,7 @@ export default function VehicleTypePreset({
   locked,
 }: VehicleTypePresetProps) {
   return (
-    <div className="ml-auto">
+    <div>
       <label
         className="block text-sm text-zinc-400 text-center"
         htmlFor="selectVehicleType"

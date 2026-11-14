@@ -38,6 +38,7 @@ async function QuoteRequestDetail({
   // Postgres rejects malformed UUIDs with an error, so treat them as "not found" up front.
   if (!UUID.test(requestId)) notFound();
 
+  // Database retrieval
   const { supabase } = await requireStaff();
   const { data: request, error } = await supabase
     .from("quote_requests")
@@ -45,7 +46,7 @@ async function QuoteRequestDetail({
       `
       id, created_at, first_name, last_name, phone,
       vehicle_type, vehicle_year, vehicle_make, vehicle_model, removal_request, old_tint_condition, comment, replied_at,
-      quotes ( id, film_type, quote_items ( id, section, install, removal, install_price_cents, removal_price_cents, duration_minutes ) )
+      quotes ( id, film_type, staff_note, quote_items ( id, section, install, removal, install_price_cents, removal_price_cents, duration_minutes ) )
     `,
     )
     .eq("id", requestId)
@@ -74,8 +75,29 @@ async function QuoteRequestDetail({
     film_type: quote.film_type,
     items: sortBySection(quote.quote_items),
   }));
+  /* ex:
+[
+  {
+    id: "uuid-1",
+    film_type: "c2-carbon",
+    items: [
+      { id: "uuid-a", section: "sunstrip", install: true, removal: false,
+        install_price_cents: 4000, removal_price_cents: null, duration_minutes: 20 },
+      { id: "uuid-b", section: "front-sides", install: true, removal: true,
+        install_price_cents: null, removal_price_cents: 5000, duration_minutes: 45 },
+    ],
+  },
+  {
+    id: "uuid-2",
+    film_type: "pronano-ceramic",
+    items: [ ...same sections, its own install prices... ],
+  },
+]
+*/
   const locked = request.replied_at !== null;
   const vehicleType = request.vehicle_type ?? null;
+  // One note for the whole request; it's saved onto every quote, so any quote's copy will do.
+  const staffNote = request.quotes[0]?.staff_note ?? "";
 
   return (
     <>
@@ -125,6 +147,8 @@ async function QuoteRequestDetail({
         vehicleType={vehicleType}
         prices={prices}
         installTimes={installTimes}
+        currentCondition={request.old_tint_condition}
+        staffNote={staffNote}
       />
     </>
   );

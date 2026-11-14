@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { initialState, vehicleTypes } from "../lib/quote";
+import { initialState, vehicleTypes, oldTintConditions } from "../lib/quote";
 import { submitQuote } from "../actions/submitQuote";
 
 const filmOptions = [
@@ -19,37 +19,6 @@ const filmOptions = [
     value: "both",
     label: "Quote for Both",
     description: "Compare prices side by side",
-  },
-];
-
-const conditionsOfOldTint = [
-  {
-    value: "peeling",
-    label: "Peeling",
-  },
-  {
-    value: "bubbly",
-    label: "Bubbly",
-  },
-  {
-    value: "faded",
-    label: "Faded",
-  },
-  {
-    value: "blurry_hazy",
-    label: "Blurry/Hazy",
-  },
-  {
-    value: "discolored",
-    label: "Discolored",
-  },
-  {
-    value: "fine",
-    label: "Looks fine",
-  },
-  {
-    value: "other",
-    label: "Other",
   },
 ];
 
@@ -506,7 +475,7 @@ export default function QuoteForm() {
             <option value="" disabled>
               Select
             </option>
-            {conditionsOfOldTint.map((condition) => {
+            {oldTintConditions.map((condition) => {
               return (
                 <option
                   key={condition.value}
