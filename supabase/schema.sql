@@ -4,6 +4,7 @@
 -- prices and install_times (if they exist) and everything in them, including the price list.
 -- Only run it while the data is test data.
 
+drop table if exists booking_links  cascade;
 drop table if exists quote_links    cascade;
 drop table if exists bookings       cascade;
 drop table if exists quote_items    cascade;
@@ -362,9 +363,7 @@ alter table install_times enable row level security;
 grant select on public.install_times to authenticated;
 create policy "Staff read install times" on public.install_times for select to authenticated using (true);
 
--- 12. Bookings list all bookings made by users on the calendar.
-
--- 13. Keeps quotes.total_cost_cents and quotes.duration_minutes in sync with their items.
+-- 12. Keeps quotes.total_cost_cents and quotes.duration_minutes in sync with their items.
 --     Runs inside the same statement as the item update, so they save together or not at all.
 create or replace function public.recalc_quote_totals()
 returns trigger
@@ -404,3 +403,30 @@ after update on public.quote_items
 referencing new table as changed_items
 for each statement
 execute function public.recalc_quote_totals();
+
+-- 13. Booking_links, generated after quote is accepted and has a 14 day TTL
+--     A foreign key can't check that the parent quote link is 'accepted'; the function
+--     that creates a booking link must check quote_links.status = 'accepted' itself.
+create table booking_links (
+  id                 uuid primary key default gen_random_uuid(),
+  quote_link_id      uuid not null references quote_links(id) on delete cascade,
+  token_hash         text not null unique
+                     check (token_hash ~ '^[0-9a-f]{64}$'),   -- hex sha256; rejects a raw token by mistake
+  status             text not null default 'active' check (status in ('active', 'used', 'revoked')),
+  created_at         timestamptz not null default now(),
+  expires_at         timestamptz not null default now() + interval '14 days'
+  
+);
+create unique index booking_links_one_active
+  on booking_links (quote_link_id)
+  where status = 'active';
+
+alter table booking_links enable row level security;
+
+-- Staff see link status and revoke/regenerate links. No delete: keep the history.
+grant select, insert, update on public.booking_links to authenticated;
+create policy "Staff manage booking links" on public.booking_links for all to authenticated using (true) with check (true);
+
+-- The customer flow runs server-side with the secret key: the accept action creates the
+-- link (insert), and the booking page and book action look it up and mark it used.
+grant select, insert, update on public.booking_links to service_role;
