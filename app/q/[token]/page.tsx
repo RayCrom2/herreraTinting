@@ -13,7 +13,7 @@ import {
   sortBySection,
   formatProperNoun,
 } from "../../lib/quote";
-import { hashQuoteToken, isLinkExpired, TOKEN } from "../../lib/quoteLinks";
+import { hashToken, isLinkExpired, TOKEN } from "../../lib/quoteLinks";
 import RespondButton from "./RespondButton";
 
 export const metadata: Metadata = {
@@ -61,7 +61,7 @@ async function CustomerQuote({
       quote_links!inner ( status, expires_at, accepted_quote_id )
     `,
     )
-    .eq("quote_links.token_hash", hashQuoteToken(token))
+    .eq("quote_links.token_hash", hashToken(token))
     .maybeSingle();
 
   if (error) throw new Error(`Failed to load quote link: ${error.message}`);
