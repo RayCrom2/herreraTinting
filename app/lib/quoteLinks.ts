@@ -6,7 +6,7 @@ export const TOKEN = /^[A-Za-z0-9_-]{43}$/;
 export const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // 32 random bytes = 256 bits: unguessable, and URL-safe in base64url form.
-export function createQuoteToken() {
+export function createToken() {
   return randomBytes(32).toString("base64url");
 }
 

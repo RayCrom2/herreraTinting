@@ -1,7 +1,7 @@
 "use server";
 import { refresh } from "next/cache";
 import { requireStaff } from "../lib/dal";
-import { createQuoteToken, hashQuoteToken, quoteLinkUrl, UUID } from "../lib/quoteLinks";
+import { createToken, hashQuoteToken, quoteLinkUrl, UUID } from "../lib/quoteLinks";
 import type { SendState } from "../lib/quote";
 
 export async function sendQuote(_prevState: SendState, formData: FormData): Promise<SendState> {
@@ -12,7 +12,7 @@ export async function sendQuote(_prevState: SendState, formData: FormData): Prom
     return { status: "error", message: "...", url: null };
   }
 
-  const token = createQuoteToken();
+  const token = createToken();
 
   // send_quote locks the request (sets replied_at) and stores the hash in one transaction.
   const { error } = await supabase.rpc("send_quote", {

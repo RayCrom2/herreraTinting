@@ -430,3 +430,62 @@ create policy "Staff manage booking links" on public.booking_links for all to au
 -- The customer flow runs server-side with the secret key: the accept action creates the
 -- link (insert), and the booking page and book action look it up and mark it used.
 grant select, insert, update on public.booking_links to service_role;
+
+-- 14. Called by the customer's accept action. Accepts the chosen quote and creates its
+--     booking link in one transaction; if the quote link isn't active, nothing changes.
+create or replace function public.accept_quote(
+  p_quote_link_token_hash  text,      -- sha256 of the quote_link URL token, computed in the server action
+  p_quote_id    uuid,
+  p_booking_link_token_hash text     -- sha256 of the booking_link URL token, computed in the server action
+)
+returns uuid              -- the new booking_links.id
+language plpgsql
+security invoker          -- runs as the caller (service_role via the accept action), so its grants apply
+set search_path = ''
+as $$
+declare
+  v_quote_link_id uuid;
+  v_booking_link_id uuid;
+begin
+  update public.quote_links
+  set status = 'accepted', accepted_quote_id = p_quote_id
+  where token_hash = p_quote_link_token_hash
+    and status = 'active'
+    and expires_at > now()
+  returning id into v_quote_link_id;
+
+  if not found then 
+    raise exception 'Quote link is invalid, expired, or already answered';
+  end if;
+  insert into public.booking_links (quote_link_id, token_hash)
+    values (v_quote_link_id, p_booking_link_token_hash)
+  returning id into v_booking_link_id;
+  
+  return v_booking_link_id;
+
+end;
+$$;
+
+revoke execute on function public.accept_quote(text, uuid, text) from public, anon, authenticated;
+grant execute on function public.accept_quote(text, uuid, text) to service_role;
+
+
+
+-- booking links
+/*
+id: uuid;
+quote_link_id: FK;
+token_hash: text;
+status: active | used | revoked;
+created_at: timestamptz;
+expires_at: timestamptz + interval 14;
+*/
+
+-- booking
+/*
+id: uuid;
+booking_link_id: FK;
+date/time start;
+date/time end;
+status: Scheduled | Cancelled | Completed | No Show (maybe | In Progress)
+*/
