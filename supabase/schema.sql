@@ -469,23 +469,90 @@ $$;
 revoke execute on function public.accept_quote(text, uuid, text) from public, anon, authenticated;
 grant execute on function public.accept_quote(text, uuid, text) to service_role;
 
+-- 15. Add bookings table to represent booking_links being used successfully
+create extension if not exists btree_gist;
+create table bookings (
+  id                uuid primary key default gen_random_uuid(),
+  created_at        timestamptz not null default now(),
+  booking_link_id   uuid not null references booking_links(id) on delete restrict unique,
+  starts_at        timestamptz not null,
+  ends_at          timestamptz not null,
+  status            text not null default 'scheduled'
+                    check (status in ('scheduled', 'cancelled', 'completed', 'no_show')),
 
+  check(ends_at > starts_at),
+  exclude using gist (tstzrange(starts_at, ends_at) with &&) where (status = 'scheduled')
+);
 
--- booking links
-/*
-id: uuid;
-quote_link_id: FK;
-token_hash: text;
-status: active | used | revoked;
-created_at: timestamptz;
-expires_at: timestamptz + interval 14;
-*/
+alter table bookings enable row level security;
 
--- booking
-/*
-id: uuid;
-booking_link_id: FK;
-date/time start;
-date/time end;
-status: Scheduled | Cancelled | Completed | No Show (maybe | In Progress)
-*/
+-- Staff see bookings and can cancel or mark booking as completed, cancelled, or as a 'no show'. No delete: keep the history.
+-- No insert: every booking comes from a customer's booking link via book_appointment.
+grant select, update on public.bookings to authenticated;
+create policy "Staff manage bookings" on public.bookings for all to authenticated using (true) with check (true);
+
+-- The customer flow runs server-side with the secret key: the book action inserts the
+-- booking through book_appointment. Customers never change a booking afterwards.
+grant select, insert on public.bookings to service_role;
+
+-- 16. Called by the customer's book action. Uses the booking link and creates the booking
+--     in one transaction; if the link isn't active, or the slot is taken, nothing changes.
+create or replace function public.book_appointment(
+  p_booking_link_token_hash  text,   -- sha256 of the URL token, computed in the server action
+  p_date                     date,   -- the calendar day picked, "YYYY-MM-DD"
+  p_start_minutes            int     -- minutes after midnight, shop time (540 = 9:00 AM)
+)
+returns uuid              -- the new bookings.id
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  v_booking_link_id uuid;
+  v_quote_link_id   uuid;
+  v_duration        int;
+  v_starts_at       timestamptz;
+  v_booking_id      uuid;
+begin
+  update public.booking_links
+  set status = 'used'
+  where token_hash = p_booking_link_token_hash
+    and status = 'active'
+    and expires_at > now()
+  returning id, quote_link_id into v_booking_link_id, v_quote_link_id;
+
+  if not found then 
+    raise exception 'Booking link is invalid, expired, or already used';
+  end if;
+
+  select q.duration_minutes into v_duration
+  from public.quote_links l
+  join public.quotes q on q.id = l.accepted_quote_id
+  where l.id = v_quote_link_id;
+
+  if v_duration is null then
+    raise exception 'Accepted quote has no duration';
+  end if;
+
+  v_starts_at := (p_date + make_interval(mins => p_start_minutes))
+                  at time zone 'America/Los_Angeles';
+
+  -- The bookings exclude constraint rejects overlapping scheduled bookings. Re-raise with a
+  -- readable message but keep the 23P01 code, so the book action can tell "slot taken" apart
+  -- from a bad link (P0001). Raising again aborts the whole call, so the link stays active.
+  begin
+    insert into public.bookings (booking_link_id, starts_at, ends_at)
+      values (v_booking_link_id, v_starts_at, v_starts_at + make_interval(mins => v_duration))
+    returning id into v_booking_id;
+  exception
+    when exclusion_violation then
+      raise exception 'That time slot is already booked'
+        using errcode = 'exclusion_violation';
+  end;
+
+  return v_booking_id;
+end;
+$$;
+
+revoke execute on function public.book_appointment(text, date, int) from public, anon, authenticated;
+grant execute on function public.book_appointment(text, date, int) to service_role;
