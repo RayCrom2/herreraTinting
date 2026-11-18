@@ -496,7 +496,8 @@ create policy "Staff manage bookings" on public.bookings for all to authenticate
 grant select, insert on public.bookings to service_role;
 
 -- 16. Called by the customer's book action. Uses the booking link and creates the booking
---     in one transaction; if the link isn't active, or the slot is taken, nothing changes.
+--     in one transaction; if the link isn't active, or the slot is taken or too close to
+--     another job, nothing changes.
 create or replace function public.book_appointment(
   p_booking_link_token_hash  text,   -- sha256 of the URL token, computed in the server action
   p_date                     date,   -- the calendar day picked, "YYYY-MM-DD"
@@ -536,6 +537,20 @@ begin
 
   v_starts_at := (p_date + make_interval(mins => p_start_minutes))
                   at time zone 'America/Los_Angeles';
+
+  -- Customers need 15 minutes between jobs (matches timeBetweenAppointments in lib/booking.ts).
+  -- Only this function checks it, so a staff reschedule can still place jobs closer together;
+  -- the exclude constraint still stops true overlaps for everyone.
+  if exists (
+    select 1
+    from public.bookings b
+    where b.status = 'scheduled'
+      and tstzrange(b.starts_at - interval '15 minutes', b.ends_at + interval '15 minutes')
+          && tstzrange(v_starts_at, v_starts_at + make_interval(mins => v_duration))
+  ) then
+    raise exception 'That time slot is already booked'
+      using errcode = 'exclusion_violation';
+  end if;
 
   -- The bookings exclude constraint rejects overlapping scheduled bookings. Re-raise with a
   -- readable message but keep the 23P01 code, so the book action can tell "slot taken" apart

@@ -9,8 +9,10 @@ import {
   minutesTo12HourTime,
   toDateString,
   earliestBookableDate,
+  latestBookableDate,
 } from "@/app/lib/schedule";
 import { bookAppointment } from "@/app/actions/bookAppointment";
+import { type BookingsByDate, conflictsWithBooking } from "@/app/lib/booking";
 
 // react-day-picker is themed through CSS variables on its root element.
 const calendarTheme = {
@@ -23,9 +25,11 @@ const calendarTheme = {
 export default function DatePicker({
   token,
   durationMinutes,
+  bookings,
 }: {
   token: string;
-  durationMinutes: number | null; // null only if the quote has no time yet; then no end time is shown
+  durationMinutes: number; // the page only renders the picker once the quote has a duration
+  bookings: BookingsByDate;
 }) {
   const [selected, setSelected] = useState<Date>();
   const [time, setTime] = useState<number | null>(null);
@@ -33,14 +37,26 @@ export default function DatePicker({
     message: null,
   });
 
-  // Days before the buffer, or with no slots (closed), can't be picked.
-  function isDisabled(date: Date): boolean {
-    return (
-      toDateString(date) < earliestBookableDate() ||
-      appointmentSlotsByDay[date.getDay()].length === 0
+  // The month containing the last bookable day, so customers can't page past the window.
+  const [lastYear, lastMonth] = latestBookableDate().split("-").map(Number);
+  const endMonth = new Date(lastYear, lastMonth - 1, 1); // month is 0-based here, "12" → 11
+
+  function slotIsTaken(day: string, slot: number): boolean {
+    return (bookings[day] ?? []).some((b) =>
+      conflictsWithBooking({ start: slot, end: slot + durationMinutes }, b),
     );
   }
-
+  // Days before the buffer, or with no slots (closed), can't be picked.
+  function isDisabled(date: Date): boolean {
+    const day = toDateString(date);
+    const slots = appointmentSlotsByDay[date.getDay()];
+    return (
+      day < earliestBookableDate() ||
+      day > latestBookableDate() ||
+      slots.length === 0 ||
+      slots.every((slot) => slotIsTaken(day, slot))
+    );
+  }
   // No timeZone on purpose: `selected` is local midnight, so format it in the same local zone.
   const appointmentDate = selected?.toLocaleDateString("en-US", {
     weekday: "long",
@@ -52,10 +68,8 @@ export default function DatePicker({
   const slots = selected ? appointmentSlotsByDay[selected.getDay()] : [];
 
   // Slots are minutes after midnight in shop time, so the end is plain addition.
-  function endTime(start: number): string | null {
-    return durationMinutes === null
-      ? null
-      : minutesTo12HourTime(start + durationMinutes);
+  function endTime(start: number): string {
+    return minutesTo12HourTime(start + durationMinutes);
   }
 
   return (
@@ -68,6 +82,8 @@ export default function DatePicker({
             setSelected(day);
             setTime(null);
           }}
+          startMonth={new Date()}
+          endMonth={endMonth}
           disabled={isDisabled}
           style={calendarTheme}
         />
@@ -75,17 +91,18 @@ export default function DatePicker({
 
       {selected && (
         <section>
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-400">
-            Available times · {appointmentDate}
+          <h2 className="text-sm font-semibold text-center uppercase tracking-wider text-zinc-400">
+            Available appointments
           </h2>
           <ul className="mt-3 grid grid-cols-2 gap-3">
             {slots.map((minutes) => (
               <li key={minutes}>
                 <button
                   type="button"
-                  onClick={() => setTime(minutes)}
+                  disabled={slotIsTaken(toDateString(selected), minutes)}
+                  onClick={() => setTime(time === minutes ? null : minutes)} // clicking the picked time again clears it
                   aria-pressed={time === minutes}
-                  className={`w-full rounded-lg border px-4 py-3 font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-400 ${
+                  className={`w-full rounded-lg border px-4 py-3 font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-20 focus-visible:outline-red-400 ${
                     time === minutes
                       ? "border-red-500 bg-red-500 text-white"
                       : "border-zinc-700 bg-zinc-800 text-zinc-100 hover:border-zinc-500"
@@ -110,17 +127,18 @@ export default function DatePicker({
       {selected && time !== null && (
         <form action={formAction} className="space-y-3">
           <p className="rounded-lg border border-zinc-800 bg-zinc-900/60 p-4 text-sm text-zinc-300">
-            Drop off on{" "}
+            Please drop off by{" "}
+            <span className="font-semibold text-zinc-100">
+              {minutesTo12HourTime(time)}
+            </span>{" "}
+            on{" "}
             <span className="font-semibold text-zinc-100">
               {appointmentDate}
-            </span>{" "}
-            at{" "}
-            <span className="font-semibold text-zinc-100">
-              {minutesTo12HourTime(time - 15)}
             </span>
             {endTime(time) && (
               <>
-                . Your car should be ready around{" "}
+                . <br />
+                Your car should be ready around{" "}
                 <span className="font-semibold text-zinc-100">
                   {endTime(time)}
                 </span>

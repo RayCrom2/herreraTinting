@@ -3,7 +3,7 @@ import { refresh } from "next/cache";
 import { supabase as admin } from "../lib/supabase/admin";
 import { hashToken, TOKEN } from "../lib/quoteLinks";
 import { BOOKING_DATE } from "../lib/validation";
-import { appointmentSlotsByDay, earliestBookableDate, toDateString} from "../lib/schedule";
+import { appointmentSlotsByDay, earliestBookableDate, latestBookableDate} from "../lib/schedule";
 
 export type BookState = { message: string | null };
 
@@ -25,6 +25,8 @@ export async function bookAppointment(_prevState: BookState, formData: FormData)
   if (!appointmentSlotsByDay[weekday].includes(minutes)) return { message: "Please pick one of the available times." };
   
   if (date < earliestBookableDate()) return { message: "That day is too soon. Please pick a later date." };
+  if (date > latestBookableDate()) return { message: "That day is too far in the future. Please pick a date within 30 days of the current date." };
+
 
   const { error } = await admin.rpc("book_appointment", {
     p_booking_link_token_hash: hashToken(token),
