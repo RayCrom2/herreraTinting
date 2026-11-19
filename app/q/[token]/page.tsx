@@ -82,7 +82,7 @@ async function CustomerQuote({
 
   return (
     <>
-      <h1 className="mt-3 text-3xl">
+      <h1 className="mt-3 text-3xl mx-auto max-w-5xl">
         Hi {request.first_name}, here&apos;s your quote for your{" "}
         <span className="mt-2 text-zinc-400 font-bold">
           {request.vehicle_year} {formatProperNoun(request.vehicle_make)}{" "}

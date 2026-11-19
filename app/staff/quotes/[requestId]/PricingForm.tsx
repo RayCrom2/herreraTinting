@@ -29,7 +29,6 @@ const inputClass =
 const headerClass =
   "hidden text-right text-xs font-semibold uppercase tracking-wide md:block";
 const mobileLabelClass = "mb-1 block text-xs md:hidden";
-
 // One color per column, shared by the desktop headers, mobile labels and totals.
 const filmColors: Record<string, string> = {
   "c2-carbon": "text-blue-400",

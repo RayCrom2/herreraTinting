@@ -4,14 +4,16 @@ import RenderQuote from "./components/RenderQuotes";
 
 // Static shell renders instantly; anything reading the session or database streams in behind <Suspense>.
 export default function OpenQuotesPage() {
+  // Each staff page sets its own width (the layout's <main> doesn't), so the
+  // loading message, empty state and list all share this one.
   return (
-    <>
+    <div className="mx-auto max-w-5xl">
       <Suspense
         fallback={<p className="mt-4 text-zinc-400">Loading quotes...</p>}
       >
         <OpenQuotesList />
       </Suspense>
-    </>
+    </div>
   );
 }
 

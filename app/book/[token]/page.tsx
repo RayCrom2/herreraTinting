@@ -113,18 +113,28 @@ async function BookAppointment({
     return (
       <>
         <h1 className="mt-3 text-2xl font-bold">
-          {booking.status === "scheduled" ? "You're booked" : "Thanks for coming in"}
+          {booking.status === "scheduled"
+            ? "You're booked"
+            : "Thanks for coming in"}
         </h1>
         <dl className="mt-6 grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 text-sm">
           <dt className="text-zinc-400">Date</dt>
-          <dd className="font-medium">{shopDayFormat.format(new Date(booking.starts_at))}</dd>
+          <dd className="font-medium">
+            {shopDayFormat.format(new Date(booking.starts_at))}
+          </dd>
           <dt className="text-zinc-400">Drop off</dt>
-          <dd className="font-medium">{shopTimeFormat.format(new Date(booking.starts_at))}</dd>
+          <dd className="font-medium">
+            {shopTimeFormat.format(new Date(booking.starts_at))}
+          </dd>
           <dt className="text-zinc-400">Ready around</dt>
-          <dd className="font-medium">{shopTimeFormat.format(new Date(booking.ends_at))}</dd>
+          <dd className="font-medium">
+            {shopTimeFormat.format(new Date(booking.ends_at))}
+          </dd>
         </dl>
         {booking.status === "scheduled" && (
-          <p className="mt-4 text-zinc-400">Text us if you need to change it.</p>
+          <p className="mt-4 text-zinc-400">
+            Text us if you need to change it.
+          </p>
         )}
       </>
     );
@@ -183,7 +193,9 @@ async function BookAppointment({
 
   return (
     <div>
-      <h1 className="mt-3 text-3xl">Pick a day for your appointment</h1>
+      <h1 className="mt-3 text-3xl mx-auto max-w-5xl">
+        Pick a day for your appointment
+      </h1>
 
       <dl className="mt-6 grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 text-sm">
         {vehicleName && (

@@ -14,3 +14,4 @@ export function conflictsWithBooking(
 ):boolean {
   return b1.start < b2.end + timeBetweenAppointments && b2.start < b1.end + timeBetweenAppointments;
 }
+
