@@ -5,7 +5,21 @@ import {
   appointmentSlotsByDay,
   minutesTo12HourTime,
 } from "@/app/lib/schedule";
-import type { PlacedBooking, StaffBooking } from "./calendar";
+import {
+  jobStyle,
+  shortName,
+  shortTime,
+  type PlacedBooking,
+  type StaffBooking,
+} from "./calendar";
+import CalendarHeader, { viewHref } from "./CalendarHeader";
+
+// "2026-11" + 1 -> "2026-12", "2026-01" - 1 -> "2025-12". Day 1 of the month, so no day overflow.
+function addMonths(month: string, n: number): string {
+  const d = new Date(`${month}-01T00:00:00Z`);
+  d.setUTCMonth(d.getUTCMonth() + n);
+  return d.toISOString().slice(0, 7);
+}
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = [
@@ -32,34 +46,6 @@ const getMonthName = (month: string) => {
   const idx = Number(month.split("-")[1]);
   return MONTHS[idx - 1];
 };
-
-// Short labels and colours for the month view, where a cell is ~140px wide on desktop.
-// Keyed by film_type; null (removal-only) uses "removal". The day view can use the full filmLabels.
-const JOB_STYLES: Record<string, { label: string; dot: string }> = {
-  "pronano-ceramic": { label: "Ceramic", dot: "bg-orange-400" },
-  "c2-carbon": { label: "Carbon", dot: "bg-blue-400" },
-  removal: { label: "Removal", dot: "bg-rose-300" },
-};
-
-const jobStyle = (filmType: string | null | undefined) =>
-  JOB_STYLES[filmType ?? "removal"] ?? JOB_STYLES.removal;
-
-// 540 -> "9a", 870 -> "2:30p". Compact so a line fits in a cell.
-function shortTime(minutes: number): string {
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  const hour12 = h % 12 === 0 ? 12 : h % 12;
-  return `${hour12}${m ? `:${String(m).padStart(2, "0")}` : ""}${h >= 12 ? "p" : "a"}`;
-}
-
-// "Ray C" from first_name + last initial; last_name is null for Instagram/phone leads.
-function shortName(booking: StaffBooking): string {
-  const request = booking.booking_links.quote_links.quotes?.quote_requests;
-  if (!request) return "Booking";
-  return [request.first_name, request.last_name?.slice(0, 1)]
-    .filter(Boolean)
-    .join(" ");
-}
 
 // "Tue, Nov 24" for a "YYYY-MM-DD" string. UTC in and out, so no zone can shift the day.
 const agendaDayFormat = new Intl.DateTimeFormat("en-US", {
@@ -89,6 +75,8 @@ export default function MonthGrid({
   const today = shopToday();
   // "November 2026": the year matters once you can page across December/January.
   const monthTitle = `${getMonthName(month)} ${month.slice(0, 4)}`;
+  // Day/Week from the toggle land on today if it's in this month, otherwise the 1st.
+  const anchorDate = inCurrentMonth(today, month) ? today : `${month}-01`;
 
   // Dates in this month (not the spill-over) that have bookings, in order, for the mobile agenda.
   const agendaDays = days.filter(
@@ -97,9 +85,14 @@ export default function MonthGrid({
 
   return (
     <div className="mx-auto max-w-7xl md:px-4 grid">
-      <div className="text-4xl text-center pb-4">
-        {monthTitle}
-      </div>
+      <CalendarHeader
+        title={monthTitle}
+        view="Month"
+        date={anchorDate}
+        prevHref={viewHref("Month", `${addMonths(month, -1)}-01`)}
+        nextHref={viewHref("Month", `${addMonths(month, 1)}-01`)}
+        todayHref={viewHref("Month", today)}
+      />
       {/* Header row: Sun … Sat. Single letters on phones, where a column is ~45px wide. */}
       <div className="grid grid-cols-7 pb-2 text-center text-xs font-medium uppercase tracking-wide text-zinc-500">
         {WEEKDAYS.map((name) => (
@@ -150,7 +143,7 @@ export default function MonthGrid({
                         className="flex items-center gap-1.5 rounded px-1 py-0.5 text-xs hover:bg-zinc-800"
                       >
                         <span
-                          className={`size-2 shrink-0 rounded-full ${job.dot}`}
+                          className={`size-2 shrink-0 rounded-full ${job.bgColor}`}
                         />
                         <span className="truncate">
                           <span className="text-zinc-400">
@@ -174,7 +167,7 @@ export default function MonthGrid({
                       className={`size-1.5 rounded-full ${
                         jobStyle(
                           booking.booking_links.quote_links.quotes?.film_type,
-                        ).dot
+                        ).bgColor
                       }`}
                     />
                   ))}
@@ -216,7 +209,7 @@ export default function MonthGrid({
                         className="flex items-center gap-2 text-sm"
                       >
                         <span
-                          className={`size-2 shrink-0 rounded-full ${job.dot}`}
+                          className={`size-2 shrink-0 rounded-full ${job.bgColor}`}
                         />
                         <span className="w-16 shrink-0 text-zinc-400">
                           {minutesTo12HourTime(startMinutes)}

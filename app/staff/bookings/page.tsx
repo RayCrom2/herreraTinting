@@ -2,8 +2,9 @@ import { Suspense } from "react";
 import { requireStaff } from "../../lib/dal";
 import { shopToday, addDaysToDateString } from "../../lib/schedule";
 import { isValidDateString, isValidYearAndMonth } from "@/app/lib/validation";
-import MonthGrid from "./MonthGrid";
 import { groupByShopDay, type StaffBooking } from "./calendar";
+import MonthGrid from "./MonthGrid";
+import TimeGrid from "./TimeGrid";
 
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
 type CalendarView =
@@ -86,6 +87,19 @@ function visibleDateRange(cal: CalendarView): { start: string; end: string } {
   };
 }
 
+// Every date from start to end, inclusive. ISO "YYYY-MM-DD" strings sort like dates, so <= works.
+function buildDays(range: { start: string; end: string }): string[] {
+  const days: string[] = [];
+  for (
+    let day = range.start;
+    day <= range.end;
+    day = addDaysToDateString(day, 1)
+  ) {
+    days.push(day);
+  }
+  return days;
+}
+
 async function BookingsCalendar({
   searchParams,
 }: {
@@ -105,7 +119,7 @@ async function BookingsCalendar({
     .from("bookings")
     .select(
       `id, starts_at, ends_at, booking_links  (
-      quote_links ( quotes(film_type, quote_requests(first_name, last_name, phone, old_tint_condition, comment))))`,
+      quote_links ( quotes(film_type, quote_items(section, install, removal), quote_requests(id, first_name, last_name, phone, old_tint_condition, comment))))`,
     )
     .eq(`status`, "scheduled")
     .gte("starts_at", rangeStart)
@@ -117,20 +131,8 @@ async function BookingsCalendar({
   // The client has no generated schema types, so it guesses every embed is an array.
   // These are all to-one links, which PostgREST returns as objects: StaffBooking is the real shape.
   const byDay = groupByShopDay(bookings as unknown as StaffBooking[], range);
-
-  if (cal.view === "month") {
-    return <MonthGrid month={cal.month} range={range} byDay={byDay} />;
+  if (cal.view === "day" || cal.view === "week") {
+    return <TimeGrid days={buildDays(range)} byDay={byDay} date={cal.date} />;
   }
-
-  // Debug output for step 2 (still used by day and week until TimeGrid exists). A Map doesn't JSON.stringify (it prints {}), so turn it into
-  // a plain object first. Check: keys are shop dates, extras from the padding are gone.
-  return (
-    <pre className="text-xs mx-auto max-w-5xl">
-      {JSON.stringify(
-        { cal, range, byDay: Object.fromEntries(byDay) },
-        null,
-        2,
-      )}
-    </pre>
-  );
+  return <MonthGrid month={cal.month} range={range} byDay={byDay} />;
 }

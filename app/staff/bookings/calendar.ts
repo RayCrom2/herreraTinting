@@ -14,7 +14,10 @@ export type StaffBooking = {
       // (accept_quote sets it), but the type can't know that, so null is kept honest.
       quotes: {
         film_type: string | null; // null = removal-only job; label with filmLabels
+        // One row per window on the quote: install = gets new film, removal = old tint comes off.
+        quote_items: { section: string; install: boolean; removal: boolean }[];
         quote_requests: {
+          id: string; // for the /staff/quotes/[requestId] link
           first_name: string;
           last_name: string | null; // null for Instagram/phone leads
           phone: string | null;
@@ -57,4 +60,33 @@ export function groupByShopDay<T extends { starts_at: string; ends_at: string }>
 
   // The query is ordered by starts_at, so each day's array is already earliest first.
   return byDay;
+}
+
+// Short labels and colours for the month view, where a cell is ~140px wide on desktop.
+// Keyed by film_type; null (removal-only) uses "removal". The day view can use the full filmLabels.
+export const JOB_STYLES: Record<string, { label: string; bgColor: string }> = {
+  "pronano-ceramic": { label: "Ceramic", bgColor: "bg-orange-400" },
+  "c2-carbon": { label: "Carbon", bgColor: "bg-blue-400" },
+  removal: { label: "Removal", bgColor: "bg-rose-300" },
+};
+
+// Falls back to the removal style for null and for any film_type missing from JOB_STYLES.
+export const jobStyle = (filmType: string | null | undefined) =>
+  JOB_STYLES[filmType ?? "removal"] ?? JOB_STYLES.removal;
+
+// 540 -> "9a", 870 -> "2:30p". Compact so a line fits in a cell.
+export function shortTime(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  const hour12 = h % 12 === 0 ? 12 : h % 12;
+  return `${hour12}${m ? `:${String(m).padStart(2, "0")}` : ""}${h >= 12 ? "p" : "a"}`;
+}
+
+// "Ray C" from first_name + last initial; last_name is null for Instagram/phone leads.
+export function shortName(booking: StaffBooking): string {
+  const request = booking.booking_links.quote_links.quotes?.quote_requests;
+  if (!request) return "Booking";
+  return [request.first_name, request.last_name?.slice(0, 1)]
+    .filter(Boolean)
+    .join(" ");
 }
