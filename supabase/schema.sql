@@ -4,6 +4,7 @@
 -- prices and install_times (if they exist) and everything in them, including the price list.
 -- Only run it while the data is test data.
 
+drop table if exists booking_links  cascade;
 drop table if exists quote_links    cascade;
 drop table if exists bookings       cascade;
 drop table if exists quote_items    cascade;
@@ -362,9 +363,7 @@ alter table install_times enable row level security;
 grant select on public.install_times to authenticated;
 create policy "Staff read install times" on public.install_times for select to authenticated using (true);
 
--- 12. Bookings list all bookings made by users on the calendar.
-
--- 13. Keeps quotes.total_cost_cents and quotes.duration_minutes in sync with their items.
+-- 12. Keeps quotes.total_cost_cents and quotes.duration_minutes in sync with their items.
 --     Runs inside the same statement as the item update, so they save together or not at all.
 create or replace function public.recalc_quote_totals()
 returns trigger
@@ -404,3 +403,171 @@ after update on public.quote_items
 referencing new table as changed_items
 for each statement
 execute function public.recalc_quote_totals();
+
+-- 13. Booking_links, generated after quote is accepted and has a 14 day TTL
+--     A foreign key can't check that the parent quote link is 'accepted'; the function
+--     that creates a booking link must check quote_links.status = 'accepted' itself.
+create table booking_links (
+  id                 uuid primary key default gen_random_uuid(),
+  quote_link_id      uuid not null references quote_links(id) on delete cascade,
+  token_hash         text not null unique
+                     check (token_hash ~ '^[0-9a-f]{64}$'),   -- hex sha256; rejects a raw token by mistake
+  status             text not null default 'active' check (status in ('active', 'used', 'revoked')),
+  created_at         timestamptz not null default now(),
+  expires_at         timestamptz not null default now() + interval '14 days'
+  
+);
+create unique index booking_links_one_active
+  on booking_links (quote_link_id)
+  where status = 'active';
+
+alter table booking_links enable row level security;
+
+-- Staff see link status and revoke/regenerate links. No delete: keep the history.
+grant select, insert, update on public.booking_links to authenticated;
+create policy "Staff manage booking links" on public.booking_links for all to authenticated using (true) with check (true);
+
+-- The customer flow runs server-side with the secret key: the accept action creates the
+-- link (insert), and the booking page and book action look it up and mark it used.
+grant select, insert, update on public.booking_links to service_role;
+
+-- 14. Called by the customer's accept action. Accepts the chosen quote and creates its
+--     booking link in one transaction; if the quote link isn't active, nothing changes.
+create or replace function public.accept_quote(
+  p_quote_link_token_hash  text,      -- sha256 of the quote_link URL token, computed in the server action
+  p_quote_id    uuid,
+  p_booking_link_token_hash text     -- sha256 of the booking_link URL token, computed in the server action
+)
+returns uuid              -- the new booking_links.id
+language plpgsql
+security invoker          -- runs as the caller (service_role via the accept action), so its grants apply
+set search_path = ''
+as $$
+declare
+  v_quote_link_id uuid;
+  v_booking_link_id uuid;
+begin
+  update public.quote_links
+  set status = 'accepted', accepted_quote_id = p_quote_id
+  where token_hash = p_quote_link_token_hash
+    and status = 'active'
+    and expires_at > now()
+  returning id into v_quote_link_id;
+
+  if not found then 
+    raise exception 'Quote link is invalid, expired, or already answered';
+  end if;
+  insert into public.booking_links (quote_link_id, token_hash)
+    values (v_quote_link_id, p_booking_link_token_hash)
+  returning id into v_booking_link_id;
+  
+  return v_booking_link_id;
+
+end;
+$$;
+
+revoke execute on function public.accept_quote(text, uuid, text) from public, anon, authenticated;
+grant execute on function public.accept_quote(text, uuid, text) to service_role;
+
+-- 15. Add bookings table to represent booking_links being used successfully
+create extension if not exists btree_gist;
+create table bookings (
+  id                uuid primary key default gen_random_uuid(),
+  created_at        timestamptz not null default now(),
+  booking_link_id   uuid not null references booking_links(id) on delete restrict unique,
+  starts_at        timestamptz not null,
+  ends_at          timestamptz not null,
+  status            text not null default 'scheduled'
+                    check (status in ('scheduled', 'cancelled', 'completed', 'no_show')),
+
+  check(ends_at > starts_at),
+  exclude using gist (tstzrange(starts_at, ends_at) with &&) where (status = 'scheduled')
+);
+
+alter table bookings enable row level security;
+
+-- Staff see bookings and can cancel or mark booking as completed, cancelled, or as a 'no show'. No delete: keep the history.
+-- No insert: every booking comes from a customer's booking link via book_appointment.
+grant select, update on public.bookings to authenticated;
+create policy "Staff manage bookings" on public.bookings for all to authenticated using (true) with check (true);
+
+-- The customer flow runs server-side with the secret key: the book action inserts the
+-- booking through book_appointment. Customers never change a booking afterwards.
+grant select, insert on public.bookings to service_role;
+
+-- 16. Called by the customer's book action. Uses the booking link and creates the booking
+--     in one transaction; if the link isn't active, or the slot is taken or too close to
+--     another job, nothing changes.
+create or replace function public.book_appointment(
+  p_booking_link_token_hash  text,   -- sha256 of the URL token, computed in the server action
+  p_date                     date,   -- the calendar day picked, "YYYY-MM-DD"
+  p_start_minutes            int     -- minutes after midnight, shop time (540 = 9:00 AM)
+)
+returns uuid              -- the new bookings.id
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  v_booking_link_id uuid;
+  v_quote_link_id   uuid;
+  v_duration        int;
+  v_starts_at       timestamptz;
+  v_booking_id      uuid;
+begin
+  update public.booking_links
+  set status = 'used'
+  where token_hash = p_booking_link_token_hash
+    and status = 'active'
+    and expires_at > now()
+  returning id, quote_link_id into v_booking_link_id, v_quote_link_id;
+
+  if not found then 
+    raise exception 'Booking link is invalid, expired, or already used';
+  end if;
+
+  select q.duration_minutes into v_duration
+  from public.quote_links l
+  join public.quotes q on q.id = l.accepted_quote_id
+  where l.id = v_quote_link_id;
+
+  if v_duration is null then
+    raise exception 'Accepted quote has no duration';
+  end if;
+
+  v_starts_at := (p_date + make_interval(mins => p_start_minutes))
+                  at time zone 'America/Los_Angeles';
+
+  -- Customers need 15 minutes between jobs (matches timeBetweenAppointments in lib/booking.ts).
+  -- Only this function checks it, so a staff reschedule can still place jobs closer together;
+  -- the exclude constraint still stops true overlaps for everyone.
+  if exists (
+    select 1
+    from public.bookings b
+    where b.status = 'scheduled'
+      and tstzrange(b.starts_at - interval '15 minutes', b.ends_at + interval '15 minutes')
+          && tstzrange(v_starts_at, v_starts_at + make_interval(mins => v_duration))
+  ) then
+    raise exception 'That time slot is already booked'
+      using errcode = 'exclusion_violation';
+  end if;
+
+  -- The bookings exclude constraint rejects overlapping scheduled bookings. Re-raise with a
+  -- readable message but keep the 23P01 code, so the book action can tell "slot taken" apart
+  -- from a bad link (P0001). Raising again aborts the whole call, so the link stays active.
+  begin
+    insert into public.bookings (booking_link_id, starts_at, ends_at)
+      values (v_booking_link_id, v_starts_at, v_starts_at + make_interval(mins => v_duration))
+    returning id into v_booking_id;
+  exception
+    when exclusion_violation then
+      raise exception 'That time slot is already booked'
+        using errcode = 'exclusion_violation';
+  end;
+
+  return v_booking_id;
+end;
+$$;
+
+revoke execute on function public.book_appointment(text, date, int) from public, anon, authenticated;
+grant execute on function public.book_appointment(text, date, int) to service_role;

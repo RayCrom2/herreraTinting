@@ -1,8 +1,9 @@
 "use server";
 import { refresh } from "next/cache";
 import { supabase as admin } from "../lib/supabase/admin";
-import { hashQuoteToken, TOKEN, UUID } from "../lib/quoteLinks";
+import { createToken, hashToken, bookingLinkUrl, TOKEN, UUID } from "../lib/quoteLinks";
 import { type RespondState } from "../lib/quote";
+import { redirect } from "next/navigation";
 
 // Public action: anyone can call it, so it trusts nothing from the page but the token.
 export async function respondToQuote(_prevState: RespondState, formData: FormData): Promise<RespondState> {
@@ -14,8 +15,22 @@ export async function respondToQuote(_prevState: RespondState, formData: FormDat
 
   let changes;
   if (response === "accept" && UUID.test(quoteId)) {
-    // The quote_links_accepted_quote_fkey constraint rejects a quote from any other request.
-    changes = { status: "accepted", accepted_quote_id: quoteId };
+    const bookingToken = createToken();
+    const { error } = await admin.rpc("accept_quote", {
+      p_quote_link_token_hash: hashToken(token),
+      p_quote_id: quoteId,
+      p_booking_link_token_hash: hashToken(bookingToken),
+    });
+    if (error) {
+      console.error("Failed to accept this quote: ", error);
+      // P0001 is accept_quote's own `raise exception`: the link was already answered, revoked or expired.
+      if (error.code === "P0001") {
+        return { message: "This quote can't be changed anymore. Text us if you need help." };
+      }
+      return { message: "Something went wrong. Please try again." };
+    }
+    const bookingUrl = bookingLinkUrl(bookingToken);
+    redirect(bookingUrl);
   } else if (response === "decline") {
     changes = { status: "declined" };
   } else {
@@ -27,7 +42,7 @@ export async function respondToQuote(_prevState: RespondState, formData: FormDat
   const { data, error } = await admin
     .from("quote_links")
     .update(changes)
-    .eq("token_hash", hashQuoteToken(token))
+    .eq("token_hash", hashToken(token))
     .eq("status", "active")
     .gt("expires_at", new Date().toISOString())
     .select("id");

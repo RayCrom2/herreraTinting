@@ -1,7 +1,7 @@
 "use server";
 import { refresh } from "next/cache";
 import { requireStaff } from "../lib/dal";
-import { createQuoteToken, hashQuoteToken, quoteLinkUrl } from "../lib/quoteLinks";
+import { createToken, hashToken, quoteLinkUrl } from "../lib/quoteLinks";
 import { UUID } from "../lib/quoteLinks";
 import { SendState } from "../lib/quote";
 
@@ -12,12 +12,12 @@ export async function resendQuote(requestId: string, _prevState: SendState): Pro
         return { status: "error", message: "...", url: null };
     }
 
-    const token = createQuoteToken();
+    const token = createToken();
 
     // resend_quote revokes the active link and stores the new hash in one transaction.
     const { error } = await supabase.rpc("resend_quote", {
         p_request_id: requestId,
-        p_token_hash: hashQuoteToken(token),
+        p_token_hash: hashToken(token),
     });
 
     if (error) {

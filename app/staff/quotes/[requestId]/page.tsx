@@ -21,7 +21,11 @@ export default function QuoteRequestPage({
   return (
     <>
       <Suspense
-        fallback={<p className="mt-4 text-zinc-400">Loading quote...</p>}
+        fallback={
+          <p className="mt-4 text-zinc-400 mx-auto max-w-5xl">
+            Loading quote...
+          </p>
+        }
       >
         <QuoteRequestDetail params={params} />
       </Suspense>
@@ -100,7 +104,7 @@ async function QuoteRequestDetail({
   const staffNote = request.quotes[0]?.staff_note ?? "";
 
   return (
-    <>
+    <div className="mx-auto max-w-5xl">
       <header className="mt-4">
         <div className="flex items-center relative">
           <h1 className="text-3xl font-bold">
@@ -150,6 +154,6 @@ async function QuoteRequestDetail({
         currentCondition={request.old_tint_condition}
         staffNote={staffNote}
       />
-    </>
+    </div>
   );
 }

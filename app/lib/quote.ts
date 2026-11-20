@@ -44,9 +44,9 @@ export const filmDescriptions: Record<string, string> = {
 export const sectionLabels: Record<string, string> = {
   windshield: "Windshield",
   sunstrip: "Sunstrip",
-  "front-sides": "Front sides",
-  "rear-sides": "Rear sides",
-  "rear-windshield": "Rear windshield",
+  "front-sides": "Front Sides",
+  "rear-sides": "Rear Sides",
+  "rear-windshield": "Rear Windshield",
   sunroof: "Sunroof",
 };
 
@@ -233,7 +233,53 @@ export const oldTintConditions: tintConditions[] = [
   },
 ]
 
-
 export const fieldName = (kind: "install_price" | "removal_price" | "minutes", id: string):string => {
   return `${kind}:${id}`;
+}
+
+// Shown as their own line to customers; every other window is added into one "Side & rear windows" line.
+const separateSections = new Set(["windshield", "sunstrip", "sunroof"]);
+
+export type CustomerLineItem = {
+  label: string;
+  detail?: string; // the windows inside a combined line, shown small under the label
+  install_price_cents: number;
+};
+
+// Install lines for the customer's quote, front to back. Removal-only windows are skipped
+// (removal has its own subtotal); the combined line sits where its first window would be.
+export function customerLineItems(
+  items: { section: string; install_price_cents: number | null }[],
+): CustomerLineItem[] {
+  const result: CustomerLineItem[] = [];
+  const combinedNames: string[] = [];
+  let combinedCents = 0;
+  let combinedIndex = -1;
+
+  sortBySection(items).forEach((item) => {
+    if (item.install_price_cents === null) return; // removal-only window
+
+    const label = sectionLabels[item.section] ?? item.section;
+    if (separateSections.has(item.section)) {
+      result.push({ label, install_price_cents: item.install_price_cents });
+    } else {
+      if (combinedIndex === -1) combinedIndex = result.length;
+      combinedNames.push(label);
+      combinedCents += item.install_price_cents;
+    }
+  });
+
+  if (combinedIndex !== -1) {
+    // One window keeps its own name; several get a short label with the list underneath.
+    const line: CustomerLineItem =
+      combinedNames.length === 1
+        ? { label: combinedNames[0], install_price_cents: combinedCents }
+        : {
+            label: "Side & rear windows",
+            detail: combinedNames.join(", "),
+            install_price_cents: combinedCents,
+          };
+    result.splice(combinedIndex, 0, line);
+  }
+  return result;
 }

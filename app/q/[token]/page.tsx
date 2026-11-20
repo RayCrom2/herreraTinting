@@ -8,12 +8,11 @@ import {
   filmLabels,
   formatMinutes,
   formatMoney,
-  sectionLabels,
   sortByFilm,
-  sortBySection,
   formatProperNoun,
+  customerLineItems,
 } from "../../lib/quote";
-import { hashQuoteToken, isLinkExpired, TOKEN } from "../../lib/quoteLinks";
+import { hashToken, isLinkExpired, TOKEN } from "../../lib/quoteLinks";
 import RespondButton from "./RespondButton";
 
 export const metadata: Metadata = {
@@ -61,7 +60,7 @@ async function CustomerQuote({
       quote_links!inner ( status, expires_at, accepted_quote_id )
     `,
     )
-    .eq("quote_links.token_hash", hashQuoteToken(token))
+    .eq("quote_links.token_hash", hashToken(token))
     .maybeSingle();
 
   if (error) throw new Error(`Failed to load quote link: ${error.message}`);
@@ -83,7 +82,7 @@ async function CustomerQuote({
 
   return (
     <>
-      <h1 className="mt-3 text-3xl">
+      <h1 className="mt-3 text-3xl mx-auto max-w-5xl">
         Hi {request.first_name}, here&apos;s your quote for your{" "}
         <span className="mt-2 text-zinc-400 font-bold">
           {request.vehicle_year} {formatProperNoun(request.vehicle_make)}{" "}
@@ -103,8 +102,9 @@ async function CustomerQuote({
           const name = quote.film_type
             ? filmLabels[quote.film_type]
             : "Tint removal";
-          const items = sortBySection(quote.quote_items);
-          const removalCents = items.reduce(
+          const displayedItems = customerLineItems(quote.quote_items);
+
+          const removalCents = quote.quote_items.reduce(
             (sum, item) => sum + (item.removal_price_cents ?? 0),
             0,
           );
@@ -128,17 +128,17 @@ async function CustomerQuote({
                 About {formatMinutes(quote.duration_minutes)} in the shop
               </p>
               <ul className="mt-4 space-y-1 border-t border-zinc-800 pt-3 text-sm text-zinc-300">
-                {items.map((item) => (
-                  <li key={item.section} className="flex justify-between gap-4">
-                    <span>{sectionLabels[item.section]}</span>
-                    <span className="text-right tabular-nums">
-                      {item.install_price_cents !== null &&
-                        formatMoney(item.install_price_cents)}
-                      {item.install_price_cents !== null &&
-                        item.removal_price_cents !== null &&
-                        " + "}
-                      {item.removal_price_cents !== null &&
-                        `${formatMoney(item.removal_price_cents)} removal`}
+                {displayedItems.map((item) => (
+                  <li key={item.label} className="flex justify-between gap-4">
+                    {/* min-w-0 lets long text wrap in its own column; shrink-0 keeps prices on one line */}
+                    <div className="min-w-0">
+                      <span>{item.label}</span>
+                      {item.detail && (
+                        <p className="text-xs text-zinc-500">{item.detail}</p>
+                      )}
+                    </div>
+                    <span className="shrink-0 text-right tabular-nums">
+                      {formatMoney(item.install_price_cents)}
                     </span>
                   </li>
                 ))}
@@ -146,7 +146,7 @@ async function CustomerQuote({
               {/* A removal-only quote's total is already all removal, so the subtotal would repeat it. */}
               {quote.film_type && removalCents > 0 && (
                 <p className="mt-2 flex justify-between gap-4 text-sm text-zinc-400">
-                  <span>Removal only</span>
+                  <span>Removal</span>
                   <span className="tabular-nums">
                     {formatMoney(removalCents)}
                   </span>

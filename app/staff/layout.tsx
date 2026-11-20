@@ -41,8 +41,11 @@ export default function StaffLayout({
           </form>
         </div>
       </header>
-      <main className="mx-auto max-w-5xl px-4 py-8">
-        <Suspense fallback={<p className="text-zinc-400">Loading...</p>}>
+      {/* No max-w here: each page sets its own width (bookings is wider than the quote pages). */}
+      <main className="px-4 py-8">
+        <Suspense
+          fallback={<p className="mx-auto max-w-5xl text-zinc-400">Loading...</p>}
+        >
           {children}
         </Suspense>
       </main>
