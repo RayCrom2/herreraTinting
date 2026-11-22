@@ -29,6 +29,41 @@ export type StaffBooking = {
   };
 };
 
+// One booking opened in the details panel: the accepted quote with its prices, for staff.
+// Same rules as StaffBooking: keep it in step with loadBookingDetails' select in page.tsx.
+export type BookingDetail = {
+  id: string;
+  starts_at: string;
+  ends_at: string;
+  booking_links: {
+    quote_links: {
+      quotes: {
+        film_type: string | null;
+        total_cost_cents: number | null;
+        duration_minutes: number | null;
+        staff_note: string | null;
+        quote_items: {
+          section: string;
+          install: boolean;
+          removal: boolean;
+          install_price_cents: number | null;
+          removal_price_cents: number | null;
+        }[];
+        quote_requests: {
+          first_name: string;
+          last_name: string | null;
+          phone: string | null;
+          vehicle_year: string;
+          vehicle_make: string;
+          vehicle_model: string;
+          old_tint_condition: string | null;
+          comment: string | null;
+        };
+      } | null;
+    };
+  };
+};
+
 // One booking placed on the shop's clock: the date it belongs to and its start/end as
 // minutes after midnight, the same shape as appointmentSlotsByDay (540 = 9:00 AM).
 // The day view positions blocks with startMinutes/endMinutes; booking keeps the nested data.
