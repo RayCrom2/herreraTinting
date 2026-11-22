@@ -1,5 +1,9 @@
 import Link from "next/link";
-import CalendarHeader, { viewHref, type CalendarViewName } from "./CalendarHeader";
+import CalendarHeader, {
+  bookingHref,
+  viewHref,
+  type CalendarViewName,
+} from "./CalendarHeader";
 import { addDaysToDateString, shopToday } from "@/app/lib/schedule";
 import {
   jobStyle,
@@ -89,10 +93,12 @@ function DisplayBooking({
   placed,
   detailed,
   pxPerMinute,
+  viewUrl,
 }: {
   placed: PlacedBooking<StaffBooking>;
   detailed: boolean;
   pxPerMinute: number;
+  viewUrl: string; // the view being shown, so the details panel opens over it
 }) {
   const { booking, startMinutes, endMinutes } = placed;
   const quote = booking.booking_links.quote_links.quotes;
@@ -117,7 +123,7 @@ function DisplayBooking({
   const fullName = [request?.first_name, request?.last_name]
     .filter(Boolean)
     .join(" ");
-  const quoteHref = request ? `/staff/quotes/${request.id}` : undefined;
+  const detailsHref = bookingHref(viewUrl, booking.id);
   const time = `${shortTime(startMinutes)}–${shortTime(endMinutes)}`;
 
   // Shared by both versions: colour, position from the time math, and clipping.
@@ -127,12 +133,13 @@ function DisplayBooking({
     height: `${(endMinutes - startMinutes) * pxPerMinute}px`,
   };
 
-  // Makes the whole box open the quote. A link can't wrap the tel: link (no links inside
-  // links), so this empty one covers the box instead, and the phone link sits above it (z-10).
-  const coverLink = quoteHref && (
+  // Makes the whole box open the booking's details. A link can't wrap the tel: link (no links
+  // inside links), so this empty one covers the box instead, and the phone link sits above it (z-10).
+  const coverLink = (
     <Link
-      href={quoteHref}
-      aria-label={`Open quote for ${fullName || "this booking"}`}
+      href={detailsHref}
+      scroll={false}
+      aria-label={`Open details for ${fullName || "this booking"}`}
       className="absolute inset-0"
     />
   );
@@ -219,9 +226,10 @@ function DisplayBooking({
         )}
       </div>
 
-      {/* Mobile: colour + first name only; the whole block opens the quote. */}
+      {/* Mobile: colour + first name only; the whole block opens the booking's details. */}
       <Link
-        href={quoteHref ?? "#"}
+        href={detailsHref}
+        scroll={false}
         className={`${block} px-0.5 pt-0.5 text-[10px] leading-tight font-medium md:hidden`}
         style={position}
       >
@@ -269,6 +277,7 @@ export default function TimeGrid({
   const nextHref = viewHref(view, addDaysToDateString(date, step));
   const today = shopToday(); // "YYYY-MM-DD" in shop time, same format as days[]
   const todayHref = viewHref(view, today);
+  const viewUrl = viewHref(view, date);
 
   // Header row and body share this so their columns line up: label gutter + one column per day.
   const columns = {
@@ -337,6 +346,7 @@ export default function TimeGrid({
                   placed={p}
                   detailed={detailed}
                   pxPerMinute={pxPerMinute}
+                  viewUrl={viewUrl}
                 />
               ))}
             </div>

@@ -12,7 +12,7 @@ import {
   type PlacedBooking,
   type StaffBooking,
 } from "./calendar";
-import CalendarHeader, { viewHref } from "./CalendarHeader";
+import CalendarHeader, { bookingHref, viewHref } from "./CalendarHeader";
 
 // "2026-11" + 1 -> "2026-12", "2026-01" - 1 -> "2025-12". Day 1 of the month, so no day overflow.
 function addMonths(month: string, n: number): string {
@@ -77,6 +77,7 @@ export default function MonthGrid({
   const monthTitle = `${getMonthName(month)} ${month.slice(0, 4)}`;
   // Day/Week from the toggle land on today if it's in this month, otherwise the 1st.
   const anchorDate = inCurrentMonth(today, month) ? today : `${month}-01`;
+  const viewUrl = viewHref("Month", `${month}-01`);
 
   // Dates in this month (not the spill-over) that have bookings, in order, for the mobile agenda.
   const agendaDays = days.filter(
@@ -130,7 +131,8 @@ export default function MonthGrid({
               >
                 {dayNo}
               </Link>
-              {/* Desktop: one truncated line per booking (at most two a day: two slots). */}
+              {/* Desktop: one truncated line per booking (at most two a day: two slots).
+                  Each opens that booking's details over the month. */}
               <ul className="mt-1 hidden space-y-1 md:block">
                 {dayBookings.map(({ booking, startMinutes }) => {
                   const job = jobStyle(
@@ -139,7 +141,8 @@ export default function MonthGrid({
                   return (
                     <li key={booking.id}>
                       <Link
-                        href={`/staff/bookings?view=day&date=${date}`}
+                        href={bookingHref(viewUrl, booking.id)}
+                        scroll={false}
                         className="flex items-center gap-1.5 rounded px-1 py-0.5 text-xs hover:bg-zinc-800"
                       >
                         <span
@@ -200,9 +203,13 @@ export default function MonthGrid({
                 </Link>
                 <ul className="mt-1 space-y-1">
                   {(byDay.get(date) ?? []).map(({ booking, startMinutes }) => {
-                    const job = jobStyle(
-                      booking.booking_links.quote_links.quotes?.film_type,
-                    );
+                    const quote = booking.booking_links.quote_links.quotes;
+                    const job = jobStyle(quote?.film_type);
+                    // A film job that also takes old tint off reads "Ceramic + removal".
+                    // Removal-only jobs are already labelled "Removal".
+                    const withRemoval =
+                      quote?.film_type &&
+                      quote.quote_items.some((item) => item.removal);
                     return (
                       <li
                         key={booking.id}
@@ -216,6 +223,7 @@ export default function MonthGrid({
                         </span>
                         <span className="truncate">
                           {shortName(booking)} · {job.label}
+                          {withRemoval && " + removal"}
                         </span>
                       </li>
                     );

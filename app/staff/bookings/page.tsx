@@ -2,15 +2,23 @@ import { Suspense } from "react";
 import { requireStaff } from "../../lib/dal";
 import { shopToday, addDaysToDateString } from "../../lib/schedule";
 import { isValidDateString, isValidYearAndMonth } from "@/app/lib/validation";
-import { groupByShopDay, type StaffBooking } from "./calendar";
+import {
+  groupByShopDay,
+  type BookingDetail,
+  type StaffBooking,
+} from "./calendar";
+import BookingDetails from "./BookingDetails";
+import { viewHref } from "./CalendarHeader";
 import MonthGrid from "./MonthGrid";
 import TimeGrid from "./TimeGrid";
+import { UUID } from "@/app/lib/quoteLinks";
 
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
-type CalendarView =
+type CalendarView = (
   | { view: "month"; month: string } // "YYYY-MM"
   | { view: "week"; date: string } // "YYYY-MM-DD" (starts at corrseponding sunday)
-  | { view: "day"; date: string }; // "YYYY-MM-DD"
+  | { view: "day"; date: string } // "YYYY-MM-DD"
+) & { bookingId: string | null }; // booking whose details are open over the calendar, if any
 
 // Static shell renders instantly; anything reading the session, the URL or the database
 // streams in behind <Suspense>. searchParams is passed down still unopened: awaiting it
@@ -44,20 +52,57 @@ function single(value: string | string[] | undefined): string | undefined {
 //   ?month=2026-11             -> { view: "month", month: "2026-11" }
 //   day/week with a bad date   -> that view for today at the shop
 //   anything else              -> the current month at the shop
+// Any view can add &booking=<uuid> to open that booking's details; a bad id opens nothing.
 function parseView(params: Awaited<SearchParams>): CalendarView {
   const view = single(params.view);
   const today = shopToday();
+  const booking = single(params.booking);
+  const bookingId = booking && UUID.test(booking) ? booking : null;
 
   if (view === "day" || view === "week") {
     const date = single(params.date);
-    return { view, date: date && isValidDateString(date) ? date : today };
+    return {
+      view,
+      date: date && isValidDateString(date) ? date : today,
+      bookingId,
+    };
   }
 
   const month = single(params.month);
   return {
     view: "month",
     month: month && isValidYearAndMonth(month) ? month : today.slice(0, 7),
+    bookingId,
   };
+}
+
+// The URL of the view being shown, without ?booking=. Closing the details panel links here.
+function currentViewHref(cal: CalendarView): string {
+  if (cal.view === "month") return viewHref("Month", `${cal.month}-01`);
+  return viewHref(cal.view === "day" ? "Day" : "Week", cal.date);
+}
+
+// One booking with its accepted quote's prices, for the details panel. Looked up by id rather
+// than picked from the calendar's rows, so it opens even if it's outside the visible range.
+async function loadBookingDetails(
+  supabase: Awaited<ReturnType<typeof requireStaff>>["supabase"],
+  bookingId: string,
+): Promise<BookingDetail | null> {
+  const { data, error } = await supabase
+    .from("bookings")
+    .select(
+      `id, starts_at, ends_at, booking_links (
+      quote_links ( quotes (
+        film_type, total_cost_cents, duration_minutes, staff_note,
+        quote_items ( section, install, removal, install_price_cents, removal_price_cents ),
+        quote_requests ( first_name, last_name, phone, vehicle_year, vehicle_make, vehicle_model, old_tint_condition, comment ))))`,
+    )
+    .eq("id", bookingId)
+    .maybeSingle();
+
+  if (error) throw new Error(`Failed to load booking: ${error.message}`);
+  // Same as the calendar query: the embeds are to-one, so BookingDetail is the real shape.
+  return data as unknown as BookingDetail | null;
 }
 
 function visibleDateRange(cal: CalendarView): { start: string; end: string } {
@@ -131,8 +176,20 @@ async function BookingsCalendar({
   // The client has no generated schema types, so it guesses every embed is an array.
   // These are all to-one links, which PostgREST returns as objects: StaffBooking is the real shape.
   const byDay = groupByShopDay(bookings as unknown as StaffBooking[], range);
-  if (cal.view === "day" || cal.view === "week") {
-    return <TimeGrid days={buildDays(range)} byDay={byDay} date={cal.date} />;
-  }
-  return <MonthGrid month={cal.month} range={range} byDay={byDay} />;
+  const details = cal.bookingId
+    ? await loadBookingDetails(supabase, cal.bookingId)
+    : null;
+
+  return (
+    <>
+      {cal.view === "day" || cal.view === "week" ? (
+        <TimeGrid days={buildDays(range)} byDay={byDay} date={cal.date} />
+      ) : (
+        <MonthGrid month={cal.month} range={range} byDay={byDay} />
+      )}
+      {details && (
+        <BookingDetails booking={details} closeHref={currentViewHref(cal)} />
+      )}
+    </>
+  );
 }
