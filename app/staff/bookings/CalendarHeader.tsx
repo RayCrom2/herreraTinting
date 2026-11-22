@@ -55,7 +55,7 @@ export default function CalendarHeader({
         </Link>
       </div>
 
-      <h2 className="order-first w-full text-center text-xl font-semibold md:order-none md:w-auto">
+      <h2 className="order-first w-full text-center text-xl font-semibold md:order-none md:w-auto ml-auto">
         {title}
       </h2>
 

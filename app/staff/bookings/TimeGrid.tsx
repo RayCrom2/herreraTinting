@@ -199,10 +199,9 @@ function DisplayBooking({
         style={position}
       >
         {coverLink}
-        <div className="flex gap-2 text-sm font-semibold">
-          <p className="truncate">{fullName || "Booking"}</p>
-          <p className="ml-auto shrink-0 font-medium opacity-75">{time}</p>
-        </div>
+          <p className="ml-auto shrink-0 font-semibold opacity-75">{time}</p>
+          <p className="truncate font-semibold">{fullName || "Booking"}</p>
+
         <p className="truncate">{label}</p>
         {phoneLink}
         {removal && condition && (
@@ -302,7 +301,7 @@ export default function TimeGrid({
         {hourMarks.map((m) => (
           <div
             key={m}
-            className="absolute right-0 border-t border-gray-200"
+            className="absolute right-0 border-t border-zinc-800"
             style={{
               left: GUTTER,
               top: `${(m - calendarRange.open) * pxPerMinute}px`,
@@ -327,7 +326,7 @@ export default function TimeGrid({
           return (
             <div
               key={d}
-              className={`px-4 border relative`}
+              className={`px-4 border border-zinc-800 relative`}
               style={{
                 height: `${gridHeight}px`,
               }}
