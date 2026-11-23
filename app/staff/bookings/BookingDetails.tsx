@@ -5,12 +5,12 @@ import {
   formatMoney,
   formatPhone,
   formatProperNoun,
-  oldTintConditions,
   sectionLabels,
   sortBySection,
 } from "@/app/lib/quote";
 import { shopDayFormat, shopTimeFormat } from "@/app/lib/schedule";
 import type { BookingDetail } from "./calendar";
+import DisplayTintCondition from "../components/DisplayTintCondition";
 
 const heading = "text-xs font-semibold uppercase tracking-wide text-zinc-500";
 
@@ -38,9 +38,7 @@ export default function BookingDetails({
   const label = quote?.film_type
     ? `${filmLabels[quote.film_type] ?? quote.film_type}${removal ? " + removal" : ""}`
     : "Tint removal";
-  const condition = oldTintConditions.find(
-    (c) => c.value === request?.old_tint_condition,
-  );
+
   const start = new Date(booking.starts_at);
   const end = new Date(booking.ends_at);
 
@@ -112,10 +110,12 @@ export default function BookingDetails({
                 <p className={heading}>Job</p>
                 <p className="font-semibold">{label}</p>
               </div>
-              {removal && condition && (
+              {removal && request.old_tint_condition && (
                 <div>
                   <p className={heading}>Old tint</p>
-                  <p className={condition.color}>{condition.label}</p>
+                  <DisplayTintCondition
+                    currentCondition={request.old_tint_condition}
+                  />
                 </div>
               )}
             </div>

@@ -56,7 +56,7 @@ export type BookingDetail = {
           vehicle_year: string;
           vehicle_make: string;
           vehicle_model: string;
-          old_tint_condition: string | null;
+          old_tint_condition: string[] | null;
           comment: string | null;
         };
       } | null;

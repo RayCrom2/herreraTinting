@@ -18,11 +18,11 @@ import {
   PricingQuote,
   Price,
   InstallTime,
-  oldTintConditions,
 } from "../../../lib/quote";
 import CustomerLink, { type Customer } from "./CustomerLink";
 import RecreateLink from "./RecreateLink";
 import VehicleTypePreset from "./VehicleTypePreset";
+import DisplayTintCondition from "../../components/DisplayTintCondition";
 
 const inputClass =
   "w-full rounded-lg border bg-black px-3 py-2 text-right text-zinc-100 tabular-nums focus:border-red-500 focus:outline-none disabled:opacity-60";
@@ -61,25 +61,6 @@ function TotalCell({
       <span className={`font-bold tabular-nums ${color}`}>{value}</span>
     </div>
   );
-}
-
-function DisplayTintCondition({
-  currentCondition,
-}: {
-  currentCondition: string[] | null;
-}) {
-  const len = currentCondition?.length ?? 0;
-  if (currentCondition && len > 0) {
-    return currentCondition.map((cur, idx) => {
-      const condition = oldTintConditions.find((c) => c.value === cur);
-      return (
-        <span className={condition?.color} key={cur}>
-          {` ${condition?.label ?? cur}${idx !== len - 1 ? ", " : ""}`}
-        </span>
-      );
-    });
-  }
-  return <span> -</span>;
 }
 
 export default function PricingForm({
