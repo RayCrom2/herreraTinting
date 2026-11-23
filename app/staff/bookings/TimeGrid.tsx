@@ -12,12 +12,7 @@ import {
   type PlacedBooking,
   type StaffBooking,
 } from "./calendar";
-import {
-  filmLabels,
-  oldTintConditions,
-  sectionLabels,
-  sortBySection,
-} from "@/app/lib/quote";
+import { filmLabels } from "@/app/lib/quote";
 
 const calendarRange: { open: number; close: number } = {
   open: 480,
@@ -104,127 +99,59 @@ function DisplayBooking({
   const quote = booking.booking_links.quote_links.quotes;
   const request = quote?.quote_requests;
 
+  // "C2 Carbon + removal", "C2 Carbon", or "Tint removal" for a removal-only job.
+  // Windows, phone, old tint and notes live in BookingDetails, one click away.
   const removal = quote?.quote_items.some((q) => q.removal) ?? false;
-  // "Front Sides, Rear Sides", front of the car to back, for the windows getting each kind of work.
-  const items = sortBySection(quote?.quote_items ?? []);
-  const windows = (kind: "install" | "removal") =>
-    items
-      .filter((i) => i[kind])
-      .map((i) => sectionLabels[i.section] ?? i.section)
-      .join(", ");
-  const tintWindows = windows("install");
-  const removalWindows = windows("removal");
   const label = quote?.film_type
     ? `${filmLabels[quote.film_type] ?? quote.film_type}${removal ? " + removal" : ""}`
     : "Tint removal";
-  const condition = oldTintConditions.find(
-    (c) => c.value === request?.old_tint_condition,
-  )?.label;
   const fullName = [request?.first_name, request?.last_name]
     .filter(Boolean)
     .join(" ");
   const detailsHref = bookingHref(viewUrl, booking.id);
   const time = `${shortTime(startMinutes)}–${shortTime(endMinutes)}`;
 
-  // Shared by both versions: colour, position from the time math, and clipping.
+  // Shared by every version: colour, position from the time math, and clipping.
   const block = `absolute inset-x-1 min-h-11 overflow-hidden rounded text-left text-zinc-950 ${jobStyle(quote?.film_type).bgColor}`;
   const position = {
     top: `${(startMinutes - calendarRange.open) * pxPerMinute}px`,
     height: `${(endMinutes - startMinutes) * pxPerMinute}px`,
   };
 
-  // Makes the whole box open the booking's details. A link can't wrap the tel: link (no links
-  // inside links), so this empty one covers the box instead, and the phone link sits above it (z-10).
-  const coverLink = (
-    <Link
-      href={detailsHref}
-      scroll={false}
-      aria-label={`Open details for ${fullName || "this booking"}`}
-      className="absolute inset-0"
-    />
-  );
-  const phoneLink = request?.phone && (
-    <a
-      href={`tel:${request.phone}`}
-      className="relative z-10 block w-fit hover:underline"
-    >
-      {request.phone}
-    </a>
-  );
-
-  // Day view: the column is the full width, so spread details sideways in labelled columns.
-  // Full-strength text (no opacity) on the coloured background for readability.
+  // Day view: one wide card with bigger text. With no phone link inside any more,
+  // the whole card can be the link to the booking's details.
   if (detailed) {
-    const heading =
-      "text-[11px] font-semibold uppercase tracking-wide text-zinc-800";
     return (
-      <div
+      <Link
+        href={detailsHref}
+        scroll={false}
         className={`${block} border-l-4 border-zinc-950/30 p-3 text-sm hover:brightness-110 md:px-4 md:text-base`}
         style={position}
       >
-        {coverLink}
         <div className="flex items-baseline gap-3">
           <p className="truncate text-lg font-bold md:text-2xl">
             {fullName || "Booking"}
           </p>
           <p className="ml-auto shrink-0 font-semibold">{time}</p>
         </div>
-
-        <div className="mt-2 grid grid-cols-2 gap-x-6 md:grid-cols-3">
-          <div className="min-w-0">
-            <p className={heading}>Job</p>
-            <p className="truncate font-semibold">{label}</p>
-            {phoneLink}
-          </div>
-          <div className="min-w-0">
-            <p className={heading}>Windows</p>
-            {tintWindows && <p className="truncate">Tint: {tintWindows}</p>}
-            {removalWindows && (
-              <p className="truncate">Remove: {removalWindows}</p>
-            )}
-            {removal && condition && (
-              <p className="truncate">Old tint: {condition}</p>
-            )}
-          </div>
-          {/* Third column only from md; on a phone two columns is already tight. */}
-          {request?.comment && (
-            <div className="hidden min-w-0 md:block">
-              <p className={heading}>Note</p>
-              <p className="line-clamp-3 italic">{request.comment}</p>
-            </div>
-          )}
-        </div>
-      </div>
+        <p className="truncate font-semibold">{label}</p>
+      </Link>
     );
   }
 
   return (
     <>
-      {/* Desktop: everything useful at a glance; coverLink makes the whole box clickable. */}
-      <div
+      {/* Desktop: time, name and job at a glance; the whole box opens the details. */}
+      <Link
+        href={detailsHref}
+        scroll={false}
         className={`${block} hidden space-y-0.5 p-1.5 text-xs hover:brightness-110 md:block`}
         style={position}
       >
-        {coverLink}
-          <p className="ml-auto shrink-0 font-semibold opacity-75">{time}</p>
-          <p className="truncate font-semibold">{fullName || "Booking"}</p>
-
+        <p className="font-semibold opacity-75">{time}</p>
+        <p className="truncate font-semibold">{fullName || "Booking"}</p>
         <p className="truncate">{label}</p>
-        {phoneLink}
-        {removal && condition && (
-          <p className="truncate">Old tint: {condition}</p>
-        )}
-        {tintWindows && (
-          <p className="" title={tintWindows}>
-            Tint: {tintWindows}
-          </p>
-        )}
-        {removalWindows && (
-          <p className="truncate" title={removalWindows}>
-            Remove: {removalWindows}
-          </p>
-        )}
-      </div>
+      </Link>
 
       {/* Mobile: colour + first name only; the whole block opens the booking's details. */}
       <Link
@@ -233,6 +160,7 @@ function DisplayBooking({
         className={`${block} px-0.5 pt-0.5 text-[10px] leading-tight font-medium md:hidden`}
         style={position}
       >
+        <span className="block break-words font-semibold">{time}</span>
         <span className="block break-words">{shortName(booking)}</span>
       </Link>
     </>

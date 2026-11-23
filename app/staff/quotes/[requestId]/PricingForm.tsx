@@ -18,11 +18,11 @@ import {
   PricingQuote,
   Price,
   InstallTime,
-  oldTintConditions,
 } from "../../../lib/quote";
 import CustomerLink, { type Customer } from "./CustomerLink";
 import RecreateLink from "./RecreateLink";
 import VehicleTypePreset from "./VehicleTypePreset";
+import DisplayTintCondition from "../../components/DisplayTintCondition";
 
 const inputClass =
   "w-full rounded-lg border bg-black px-3 py-2 text-right text-zinc-100 tabular-nums focus:border-red-500 focus:outline-none disabled:opacity-60";
@@ -81,7 +81,7 @@ export default function PricingForm({
   vehicleType: string | null;
   prices: Price[];
   installTimes: InstallTime[];
-  currentCondition: string | null;
+  currentCondition: string[] | null;
   staffNote: string;
 }) {
   const [state, formAction, isPending] = useActionState(
@@ -339,20 +339,12 @@ export default function PricingForm({
   return (
     <div>
       <div className="flex items-end gap-4">
-        {currentCondition &&
-          (() => {
-            const condition = oldTintConditions.find(
-              (c) => c.value === currentCondition,
-            );
-            return (
-              <p className="text-base text-zinc-300">
-                Old tint condition:{" "}
-                <span className={condition?.color}>
-                  {condition?.label ?? currentCondition}
-                </span>
-              </p>
-            );
-          })()}
+        {currentCondition && (
+          <p className="text-base text-zinc-300">
+            Old tint condition:
+            <DisplayTintCondition currentCondition={currentCondition} />
+          </p>
+        )}
         {/* In normal flow (not absolute) so it pushes the form down instead of overlapping it. */}
         <div className="ml-auto justify-end">
           <VehicleTypePreset
