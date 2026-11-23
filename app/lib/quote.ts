@@ -82,7 +82,9 @@ export function formatMinutes(total: number) {
     if (minutes === 1) return '1 hour 1 minute';
     return `1 hour ${minutes} minutes`
   }
+  if (minutes === 0) return `${hours} hours`;
   if (minutes === 1) return `${hours} hours 1 minute`
+  
   return `${hours} hours ${minutes} minutes`;
 }
 
