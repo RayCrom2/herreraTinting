@@ -60,6 +60,7 @@ export async function submitQuote(_prevState: FormState, formData: FormData): Pr
       if (values.oldTintCondition.includes("fine") && values.oldTintCondition.length > 1){
         errors["oldTintCondition"] = "'Fine' can't be combined with other conditions. Uncheck it, or uncheck the others.";
       }
+    }
   }
 
 
