@@ -29,8 +29,10 @@ create table quote_requests (
 
   -- The customer's answer for the whole car. Staff set removal per window on quote_items.
   removal_request text check (removal_request in ('no', 'yes', 'not-sure')),
-  old_tint_condition text check (old_tint_condition in ('peeling', 'bubbly', 'faded', 'blurry_hazy', 'discolored', 'fine', 'other')),
-
+  old_tint_condition text[] check (
+    old_tint_condition <@ array['peeling','bubbly','faded','blurry_hazy','discolored','fine','other']
+    and cardinality(old_tint_condition) > 0
+  ),
 
   source          text not null
                   check (source in ('website', 'instagram', 'phone', 'text', 'other')),
@@ -96,7 +98,7 @@ grant select, insert, update, delete on public.quote_requests to service_role;
 grant select, insert, update, delete on public.quotes         to service_role;
 grant select, insert, update, delete on public.quote_items    to service_role;
 
-drop function if exists public.submit_quote_request(text, text, text, int, text, text, text, text, text[], text, text[], text);
+drop function if exists public.submit_quote_request(text, text, text, text, int, text, text, text, text, text[], text, text[], text[], text);
 -- 5. Called by app/actions/submitQuote.ts. Creates the request, one quote per film,
 --    and one item per window in a single transaction; any failure rolls back all of it.
 create or replace function public.submit_quote_request(
@@ -113,7 +115,7 @@ create or replace function public.submit_quote_request(
   p_windows        text[],   -- e.g. {'front-sides','sunroof'}
   p_removal_request text,     -- 'yes' | 'no' | 'not-sure'
   p_removal_windows text[],   -- e.g. {'front-sides','sunroof'}
-  p_old_tint_condition text,
+  p_old_tint_condition text[], -- e.g {'bubbly', 'blurry_hazy'}
   p_comment        text default null   -- optional, so it goes last
 )
 returns uuid                    -- the new quote_requests.id
@@ -139,7 +141,7 @@ begin
 
 
   insert into public.quote_requests (first_name, last_name, phone, vehicle_type, vehicle_year, vehicle_make, vehicle_model, removal_request, old_tint_condition, source, comment)
-  values (p_first_name, p_last_name, p_phone, p_vehicle_type, p_vehicle_year, p_vehicle_make, p_vehicle_model, p_removal_request, p_old_tint_condition, p_source, p_comment)
+  values (p_first_name, p_last_name, p_phone, p_vehicle_type, p_vehicle_year, p_vehicle_make, p_vehicle_model, p_removal_request, nullif(p_old_tint_condition, '{}'), p_source, p_comment)
   returning id into v_request_id;
 
   v_films := case when p_film is null then array[null::text]   -- removal only
@@ -164,9 +166,9 @@ end;
 $$;
 
 -- Only server code should call it
-revoke execute on function public.submit_quote_request(text, text, text, text, int, text, text, text, text, text[], text, text[], text, text)
+revoke execute on function public.submit_quote_request(text, text, text, text, int, text, text, text, text, text[], text, text[], text[], text)
   from public, anon, authenticated;
-grant execute on function public.submit_quote_request(text, text, text, text, int, text, text, text, text, text[], text, text[], text, text)
+grant execute on function public.submit_quote_request(text, text, text, text, int, text, text, text, text, text[], text, text[], text[], text)
   to service_role;
 
 -- 6. Staff access: logged-in staff (the authenticated role) via app/lib/dal.ts.

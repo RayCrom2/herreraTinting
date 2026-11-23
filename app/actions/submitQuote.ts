@@ -26,12 +26,13 @@ export async function submitQuote(_prevState: FormState, formData: FormData): Pr
   const errors: Record<string, string> = {};
 
   for (const [key, value] of formData.entries()) {
-    if (key === "windows" || key === "removalWindows" || key.startsWith("$ACTION")) continue;
+    if (key === "windows" || key === "removalWindows" || key === "oldTintCondition" || key.startsWith("$ACTION")) continue;
     values[key] = String(value).trim();
   }
   // Checkboxes send one "windows" entry per checked box, so collect them all.
   values.windows = formData.getAll("windows").map(String);
   values.removalWindows = formData.getAll("removalWindows").map(String);
+  values.oldTintCondition = formData.getAll("oldTintCondition").map(String);
 
   const removalRequest = values.removalWindows.length > 0 ? "yes" : values.removalNotSure ? "not-sure" : "no";
   const vehicleType = values.vehicleType === "other" ? null : values.vehicleType;
@@ -49,14 +50,16 @@ export async function submitQuote(_prevState: FormState, formData: FormData): Pr
   }
 
   if (removalRequest === "yes"){
-    if (!values.oldTintCondition){
+    if (values.oldTintCondition.length === 0){
       errors["oldTintCondition"] = "Please select the condition of the old tint you need removed.";
     }
-    else if (values.oldTintCondition === "other"){
+    else if (values.oldTintCondition.includes("other")){
       if (!values.comment){
         errors["comment"] = "You selected other for 'Old Tint Condition', please elaborate."
       }
-    }
+      if (values.oldTintCondition.includes("fine") && values.oldTintCondition.length > 1){
+        errors["oldTintCondition"] = "'Fine' can't be combined with other conditions. Uncheck it, or uncheck the others.";
+      }
   }
 
 
