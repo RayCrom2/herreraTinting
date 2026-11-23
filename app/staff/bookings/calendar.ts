@@ -21,7 +21,7 @@ export type StaffBooking = {
           first_name: string;
           last_name: string | null; // null for Instagram/phone leads
           phone: string | null;
-          old_tint_condition: string | null;
+          old_tint_condition: string[] | null;
           comment: string | null;
         };
       } | null;

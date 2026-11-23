@@ -63,6 +63,25 @@ function TotalCell({
   );
 }
 
+function DisplayTintCondition({
+  currentCondition,
+}: {
+  currentCondition: string[] | null;
+}) {
+  const len = currentCondition?.length ?? 0;
+  if (currentCondition && len > 0) {
+    return currentCondition.map((cur, idx) => {
+      const condition = oldTintConditions.find((c) => c.value === cur);
+      return (
+        <span className={condition?.color} key={cur}>
+          {` ${condition?.label ?? cur}${idx !== len - 1 ? ", " : ""}`}
+        </span>
+      );
+    });
+  }
+  return <span> -</span>;
+}
+
 export default function PricingForm({
   requestId,
   quotes,
@@ -81,7 +100,7 @@ export default function PricingForm({
   vehicleType: string | null;
   prices: Price[];
   installTimes: InstallTime[];
-  currentCondition: string | null;
+  currentCondition: string[] | null;
   staffNote: string;
 }) {
   const [state, formAction, isPending] = useActionState(
@@ -339,20 +358,12 @@ export default function PricingForm({
   return (
     <div>
       <div className="flex items-end gap-4">
-        {currentCondition &&
-          (() => {
-            const condition = oldTintConditions.find(
-              (c) => c.value === currentCondition,
-            );
-            return (
-              <p className="text-base text-zinc-300">
-                Old tint condition:{" "}
-                <span className={condition?.color}>
-                  {condition?.label ?? currentCondition}
-                </span>
-              </p>
-            );
-          })()}
+        {currentCondition && (
+          <p className="text-base text-zinc-300">
+            Old tint condition:
+            <DisplayTintCondition currentCondition={currentCondition} />
+          </p>
+        )}
         {/* In normal flow (not absolute) so it pushes the form down instead of overlapping it. */}
         <div className="ml-auto justify-end">
           <VehicleTypePreset

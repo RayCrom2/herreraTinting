@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { initialState, vehicleTypes, oldTintConditions } from "../lib/quote";
 import { submitQuote } from "../actions/submitQuote";
 
@@ -199,6 +199,67 @@ function WindowPicker({
         </label>
       ))}
     </div>
+  );
+}
+
+// A dropdown of checkboxes. Each checked box sends one "oldTintCondition" entry,
+// which submitQuote collects with getAll. No `required`: it can't mean "at least
+// one" for checkboxes, so the server checks that.
+function ConditionPicker({ selected }: { selected?: string | string[] }) {
+  const [checked, setChecked] = useState<string[]>(
+    Array.isArray(selected) ? selected : [],
+  );
+  const summary = oldTintConditions
+    .filter((c) => checked.includes(c.value))
+    .map((c) => c.label)
+    .join(", ");
+
+  return (
+    <details className="group/cond relative">
+      <summary
+        className={`${inputClass} relative cursor-pointer list-none truncate pr-10 [&::-webkit-details-marker]:hidden`}
+      >
+        {summary || <span className="text-zinc-500">Select all that apply</span>}
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+          className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400 transition-transform group-open/cond:rotate-180"
+        >
+          <path
+            fillRule="evenodd"
+            d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+            clipRule="evenodd"
+          />
+        </svg>
+      </summary>
+      <div className="absolute z-10 mt-2 w-full rounded-xl border border-zinc-800 bg-black p-2 shadow-lg">
+        {oldTintConditions.map((c) => (
+          <label
+            key={c.value}
+            className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-zinc-100 hover:bg-zinc-900"
+          >
+            <input
+              type="checkbox"
+              name="oldTintCondition"
+              value={c.value}
+              // defaultChecked, not checked: React resets the form after a failed submit,
+              // and a reset restores defaultChecked (the submitted values) on each box.
+              defaultChecked={Array.isArray(selected) && selected.includes(c.value)}
+              onChange={(e) =>
+                setChecked((prev) =>
+                  e.target.checked
+                    ? [...prev, c.value]
+                    : prev.filter((v) => v !== c.value),
+                )
+              }
+              className="size-5 shrink-0 accent-red-500 sm:size-4"
+            />
+            <span className="text-sm">{c.label}</span>
+          </label>
+        ))}
+      </div>
+    </details>
   );
 }
 
@@ -460,46 +521,12 @@ export default function QuoteForm() {
           <FieldError message={errors.removalWindows} />
         </fieldset>
 
-        <div className="relative hidden group-has-[input[name=removalWindows]:checked]/removal:block">
-          <label htmlFor="oldTintCondition" className={labelClass}>
+        <fieldset className="hidden group-has-[input[name=removalWindows]:checked]/removal:block">
+          <legend className={labelClass}>
             Old Tint Condition <span className="text-red-500">*</span>
-          </label>
-          <select
-            key={String(values.oldTintCondition ?? "")}
-            id="oldTintCondition"
-            name="oldTintCondition"
-            defaultValue={values.oldTintCondition ?? ""}
-            className={`${inputClass} appearance-none pr-10 invalid:text-zinc-500`}
-            required
-          >
-            <option value="" disabled>
-              Select
-            </option>
-            {oldTintConditions.map((condition) => {
-              return (
-                <option
-                  key={condition.value}
-                  value={condition.value}
-                  className="text-zinc-100"
-                >
-                  {condition.label}
-                </option>
-              );
-            })}
-          </select>
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-            className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400"
-          >
-            <path
-              fillRule="evenodd"
-              d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
-              clipRule="evenodd"
-            />
-          </svg>
-        </div>
+          </legend>
+          <ConditionPicker selected={values.oldTintCondition} />
+        </fieldset>
         <FieldError message={errors.oldTintCondition} />
       </div>
 
