@@ -11,6 +11,7 @@ import {
   sortByFilm,
   formatProperNoun,
   customerLineItems,
+  quoteTotalCents,
 } from "../../lib/quote";
 import { hashToken, isLinkExpired, TOKEN } from "../../lib/quoteLinks";
 import RespondButton from "./RespondButton";
@@ -54,8 +55,8 @@ async function CustomerQuote({
       `
       first_name, vehicle_year, vehicle_make, vehicle_model,
       quotes (
-        id, film_type, total_cost_cents, duration_minutes, staff_note,
-        quote_items ( section, install_price_cents, removal_price_cents )
+        id, film_type, removal_price_cents, duration_minutes, staff_note,
+        quote_items ( section, install_price_cents )
       ),
       quote_links!inner ( status, expires_at, accepted_quote_id )
     `,
@@ -104,10 +105,6 @@ async function CustomerQuote({
             : "Tint removal";
           const displayedItems = customerLineItems(quote.quote_items);
 
-          const removalCents = quote.quote_items.reduce(
-            (sum, item) => sum + (item.removal_price_cents ?? 0),
-            0,
-          );
           return (
             <li
               key={quote.id}
@@ -116,7 +113,7 @@ async function CustomerQuote({
               <div className="flex items-baseline justify-between gap-4">
                 <h2 className="text-xl font-bold">{name}</h2>
                 <span className="text-2xl font-bold tabular-nums">
-                  {formatMoney(quote.total_cost_cents)}
+                  {formatMoney(quoteTotalCents(quote))}
                 </span>
               </div>
               {quote.film_type && (
@@ -144,11 +141,11 @@ async function CustomerQuote({
                 ))}
               </ul>
               {/* A removal-only quote's total is already all removal, so the subtotal would repeat it. */}
-              {quote.film_type && removalCents > 0 && (
-                <p className="mt-2 flex justify-between gap-4 text-sm text-zinc-400">
+              {quote.film_type && quote.removal_price_cents > 0 && (
+                <p className="mt-2 flex justify-between gap-4 text-sm text-zinc-300">
                   <span>Removal</span>
                   <span className="tabular-nums">
-                    {formatMoney(removalCents)}
+                    {formatMoney(quote.removal_price_cents)}
                   </span>
                 </p>
               )}
@@ -164,7 +161,7 @@ async function CustomerQuote({
                     response="accept"
                     quoteId={quote.id}
                     label="Choose this option"
-                    confirmText={`Choose ${name} for ${formatMoney(quote.total_cost_cents)}?`}
+                    confirmText={`Choose ${name} for ${formatMoney(quoteTotalCents(quote))}?`}
                     className="w-full rounded-full bg-red-600 px-6 py-3 font-bold text-white transition-colors hover:bg-red-500 disabled:opacity-60"
                   />
                 </div>

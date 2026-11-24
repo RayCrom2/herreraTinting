@@ -285,7 +285,7 @@ export default function PricingForm({
 
   return (
     <div>
-      <div className="flex items-end gap-4">
+      <div className="flex items-end gap-4 mt-2">
         {currentCondition && (
           <p className="text-base text-zinc-300">
             Old tint condition:

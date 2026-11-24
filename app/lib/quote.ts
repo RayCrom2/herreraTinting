@@ -194,43 +194,35 @@ export const vehicleTypes = [
 type tintConditions = {
   value: string;
   label: string;
-  color: string;
 }
 export const oldTintConditions: tintConditions[] = [
 {
     value: "peeling",
     label: "Peeling",
-    color: "text-yellow-400",
   },
   {
     value: "bubbly",
     label: "Bubbly",
-    color: "text-orange-500",
   },
   {
     value: "faded",
     label: "Faded",
-    color: "text-red-600"
   },
   {
     value: "blurry_hazy",
     label: "Blurry/Hazy",
-    color: "text-orange-500",
   },
   {
     value: "discolored",
     label: "Discolored",
-    color: "text-red-600",
   },
   {
     value: "fine",
     label: "Looks fine",
-    color: "text-green-600",
   },
   {
     value: "other",
     label: "Other",
-    color: "text-purple-300",
 
   },
 ]
@@ -284,4 +276,11 @@ export function customerLineItems(
     result.splice(combinedIndex, 0, line);
   }
   return result;
+}
+
+
+export function quoteTotalCents(quote: {removal_price_cents: number | null; quote_items: {install_price_cents: number | null;}[]}){
+  const installPrice = quote.quote_items.reduce((total, item) => total + (item.install_price_cents ?? 0), 0);
+  const removalPrice = quote.removal_price_cents ?? 0;
+  return installPrice + removalPrice;
 }

@@ -39,7 +39,7 @@ export type BookingDetail = {
     quote_links: {
       quotes: {
         film_type: string | null;
-        total_cost_cents: number | null;
+        removal_price_cents: number | null;
         duration_minutes: number | null;
         staff_note: string | null;
         quote_items: {
@@ -47,7 +47,6 @@ export type BookingDetail = {
           install: boolean;
           removal: boolean;
           install_price_cents: number | null;
-          removal_price_cents: number | null;
         }[];
         quote_requests: {
           first_name: string;

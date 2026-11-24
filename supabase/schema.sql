@@ -49,8 +49,10 @@ create table quotes (
   quote_request_id  uuid not null references quote_requests(id) on delete cascade,
 
   film_type         text check (film_type in ('c2-carbon', 'pronano-ceramic')),  -- null for removal-only jobs
-  total_cost_cents  int  check (total_cost_cents >= 0),                         -- sum of item prices, set by staff
-  duration_minutes  int  check (duration_minutes > 0),                          -- sum of item durations, set by staff
+  -- Per request, not per film: savePricing writes the same three values onto every quote.
+  -- The total isn't stored; the app adds item install prices + removal_price_cents.
+  duration_minutes  int  check (duration_minutes > 0),                          -- total time for the job; null until staff set it
+  removal_price_cents int check (removal_price_cents >= 0),                     -- one price for all removal; null if none or not priced yet
   staff_note        text,
 
   unique (quote_request_id, film_type),         -- no two Ceramic quotes on one request
@@ -78,13 +80,10 @@ create table quote_items (
                     )),
 
   install           boolean not null default true,    -- put new tint on this area
-  removal           boolean not null default false,   -- take old tint off; window was in customer's removal list
-  removal_price_cents int,
-  install_price_cents int,     -- null until staff price it
-  duration_minutes  int check (duration_minutes > 0), -- null until staff set it
+  removal           boolean not null default false,   -- take old tint off; priced once per quote (quotes.removal_price_cents)
+  install_price_cents int,                            -- null until staff price it
 
   check ((install and install_price_cents >= 0) or install_price_cents is null),
-  check ((removal and removal_price_cents >= 0) or removal_price_cents is null),
   check (install or removal),                         -- a row must do something
   unique (quote_id, section)                          -- each window area appears once per quote
 );
@@ -251,17 +250,28 @@ begin
     raise exception 'Quote request not found or already sent';
   end if;
 
-  -- Every window needs a price and a time before the customer sees it.
+  -- Every tinted window needs a price.
   if exists (
     select 1
     from public.quote_items i
     join public.quotes q on q.id = i.quote_id
     where q.quote_request_id = p_request_id
-      and ((i.install and i.install_price_cents is null)
-      or (i.removal and i.removal_price_cents is null)
-      or i.duration_minutes is null)
+      and i.install and i.install_price_cents is null
   ) then
-    raise exception 'Every window needs a price and time before sending';
+    raise exception 'Not ready to send: every tinted window needs a price';
+  end if;
+
+  -- Every quote needs a time, and a removal price if any of its windows have removal.
+  if exists (
+    select 1
+    from public.quotes q
+    where q.quote_request_id = p_request_id
+      and (q.duration_minutes is null
+        or (q.removal_price_cents is null
+            and exists (select 1 from public.quote_items i
+                        where i.quote_id = q.id and i.removal)))
+  ) then
+    raise exception 'Not ready to send: the quote needs a time, and a removal price if it includes removal';
   end if;
 
   insert into public.quote_links (quote_request_id, token_hash)
@@ -365,48 +375,7 @@ alter table install_times enable row level security;
 grant select on public.install_times to authenticated;
 create policy "Staff read install times" on public.install_times for select to authenticated using (true);
 
--- 12. Keeps quotes.total_cost_cents and quotes.duration_minutes in sync with their items.
---     Runs inside the same statement as the item update, so they save together or not at all.
-create or replace function public.recalc_quote_totals()
-returns trigger
-language plpgsql
-security invoker
-set search_path = ''
-as $$
-begin
-  update public.quotes q
-  set
-    -- sum() skips nulls and is null only when every value is null, so a quote with
-    -- no prices stays null. coalesce picks the first non-null: both sums added, else
-    -- whichever one exists, else null.
-    total_cost_cents = coalesce(t.install_sum + t.removal_sum, t.install_sum, t.removal_sum),
-    duration_minutes = t.minutes_sum
-  from (
-    -- One row per changed quote, with each sum computed once.
-    select
-      i.quote_id,
-      sum(i.install_price_cents) as install_sum,
-      sum(i.removal_price_cents) as removal_sum,
-      sum(i.duration_minutes)    as minutes_sum
-    from public.quote_items i
-    where i.quote_id in (select quote_id from changed_items)
-    group by i.quote_id
-  ) t
-  where q.id = t.quote_id;
-
-  return null;  -- the return value is ignored for AFTER ... FOR EACH STATEMENT triggers
-end;
-$$;
-
--- Only UPDATE: new items start with null prices, so inserts never change a total.
--- savePricing's upsert hits existing rows, which fires this as an update.
-create trigger quote_items_recalc_totals
-after update on public.quote_items
-referencing new table as changed_items
-for each statement
-execute function public.recalc_quote_totals();
-
--- 13. Booking_links, generated after quote is accepted and has a 14 day TTL
+-- 12. Booking_links, generated after quote is accepted and has a 14 day TTL
 --     A foreign key can't check that the parent quote link is 'accepted'; the function
 --     that creates a booking link must check quote_links.status = 'accepted' itself.
 create table booking_links (
@@ -433,7 +402,7 @@ create policy "Staff manage booking links" on public.booking_links for all to au
 -- link (insert), and the booking page and book action look it up and mark it used.
 grant select, insert, update on public.booking_links to service_role;
 
--- 14. Called by the customer's accept action. Accepts the chosen quote and creates its
+-- 13. Called by the customer's accept action. Accepts the chosen quote and creates its
 --     booking link in one transaction; if the quote link isn't active, nothing changes.
 create or replace function public.accept_quote(
   p_quote_link_token_hash  text,      -- sha256 of the quote_link URL token, computed in the server action
@@ -471,7 +440,7 @@ $$;
 revoke execute on function public.accept_quote(text, uuid, text) from public, anon, authenticated;
 grant execute on function public.accept_quote(text, uuid, text) to service_role;
 
--- 15. Add bookings table to represent booking_links being used successfully
+-- 14. Add bookings table to represent booking_links being used successfully
 create extension if not exists btree_gist;
 create table bookings (
   id                uuid primary key default gen_random_uuid(),
@@ -497,7 +466,7 @@ create policy "Staff manage bookings" on public.bookings for all to authenticate
 -- booking through book_appointment. Customers never change a booking afterwards.
 grant select, insert on public.bookings to service_role;
 
--- 16. Called by the customer's book action. Uses the booking link and creates the booking
+-- 15. Called by the customer's book action. Uses the booking link and creates the booking
 --     in one transaction; if the link isn't active, or the slot is taken or too close to
 --     another job, nothing changes.
 create or replace function public.book_appointment(
