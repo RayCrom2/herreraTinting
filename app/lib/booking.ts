@@ -15,3 +15,4 @@ export function conflictsWithBooking(
   return b1.start < b2.end + timeBetweenAppointments && b2.start < b1.end + timeBetweenAppointments;
 }
 
+export const shortBookingTime = 90;

@@ -13,6 +13,7 @@ import {
   type StaffBooking,
 } from "./calendar";
 import CalendarHeader, { bookingHref, viewHref } from "./CalendarHeader";
+import { shortBookingTime } from "@/app/lib/booking";
 
 // "2026-11" + 1 -> "2026-12", "2026-01" - 1 -> "2025-12". Day 1 of the month, so no day overflow.
 function addMonths(month: string, n: number): string {
@@ -134,16 +135,19 @@ export default function MonthGrid({
               {/* Desktop: one truncated line per booking (at most two a day: two slots).
                   Each opens that booking's details over the month. */}
               <ul className="mt-1 hidden space-y-1 md:block">
-                {dayBookings.map(({ booking, startMinutes }) => {
+                {dayBookings.map(({ booking, startMinutes, endMinutes }) => {
                   const job = jobStyle(
                     booking.booking_links.quote_links.quotes?.film_type,
                   );
+                  const isShortBooking =
+                    endMinutes - startMinutes <= shortBookingTime;
+
                   return (
                     <li key={booking.id}>
                       <Link
                         href={bookingHref(viewUrl, booking.id)}
                         scroll={false}
-                        className="flex items-center gap-1.5 rounded px-1 py-0.5 text-xs hover:bg-zinc-800"
+                        className={`flex items-center gap-1.5 rounded px-1 py-0.5 text-xs hover:bg-zinc-800 ${isShortBooking ? "border border-red-600" : ""}`}
                       >
                         <span
                           className={`size-2 shrink-0 rounded-full ${job.bgColor}`}
