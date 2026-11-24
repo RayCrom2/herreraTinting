@@ -119,13 +119,13 @@ export type PricingItem = {
   install: boolean;
   removal: boolean;
   install_price_cents: number | null;
-  removal_price_cents: number | null;
-  duration_minutes: number | null;
 };
 
 export type PricingQuote = {
   id: string;
   film_type: string | null;
+  removal_price_cents: number | null; // one removal price for the whole quote
+  duration_minutes: number | null;    // total time for the whole quote
   items: PricingItem[];
 };
 
@@ -165,11 +165,11 @@ export type Price = {
   install_price_cents: number;
 };
 
-export type InstallTime = {
-  vehicle_type: string;
-  section: string;
-  install_duration_minutes: number;
-};
+// export type InstallTime = {
+//   vehicle_type: string;
+//   section: string;
+//   install_duration_minutes: number;
+// };
 
 
 export const vehicleTypes = [

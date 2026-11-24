@@ -1,7 +1,7 @@
 "use client";
 
 import { startTransition, useActionState, useState } from "react";
-import { savePricing } from "../../../actions/pricing";
+import { savePricing } from "../../../actions/savePricing";
 import { sendQuote } from "../../../actions/sendQuote";
 import {
   dollarsToCents,
@@ -17,7 +17,6 @@ import {
   type PricingItem,
   PricingQuote,
   Price,
-  InstallTime,
 } from "../../../lib/quote";
 import CustomerLink, { type Customer } from "./CustomerLink";
 import RecreateLink from "./RecreateLink";
@@ -32,14 +31,13 @@ const mobileLabelClass = "mb-1 block text-xs md:hidden";
 // One color per column, shared by the desktop headers, mobile labels and totals.
 const filmColors: Record<string, string> = {
   "c2-carbon": "text-blue-400",
-  "pronano-ceramic": "text-orange-400",
+  "pronano-ceramic": "text-yellow-400",
 };
 const removalColor = "text-rose-300";
-const minutesColor = "text-zinc-300";
+const minutesColor = "text-green-400";
 
-// Removal price and minutes don't depend on the film, so they're typed once per window (section).
-// Install price is per film, so it's typed per item.
-type SectionInputs = Record<string, { removal_price: string; minutes: string }>;
+// Install price is per film and window, so it's typed per item (keyed by item id).
+// Removal price and total minutes are one box each for the whole request.
 type InstallInputs = Record<string, string>;
 
 const centsToInput = (cents: number | null) =>
@@ -70,7 +68,6 @@ export default function PricingForm({
   customer,
   vehicleType,
   prices,
-  installTimes,
   currentCondition,
   staffNote,
 }: {
@@ -80,7 +77,6 @@ export default function PricingForm({
   customer: Customer;
   vehicleType: string | null;
   prices: Price[];
-  installTimes: InstallTime[];
   currentCondition: string[] | null;
   staffNote: string;
 }) {
@@ -108,10 +104,28 @@ export default function PricingForm({
   const needsRemoval = (section: string) =>
     savedItems.some((item) => item.section === section && item.removal);
 
-  // Columns: one install column per film (C2, then ProNano), removal (if any window has it), then minutes.
+  // Columns: the window name, then one install column per film (C2, then ProNano).
+  // A removal-only request has no film columns, so it gets one column for its total.
   const filmQuotes = quotes.filter((quote) => quote.film_type !== null);
-  const showRemoval = sections.some(needsRemoval);
-  const columns = `minmax(0,1fr) ${filmQuotes.map(() => "7rem ").join("")}${showRemoval ? "7rem " : ""}5.5rem`;
+  const columns = `minmax(0,1fr) ${filmQuotes.length > 0 ? filmQuotes.map(() => "7rem").join(" ") : "7rem"}`;
+
+  // Rows in the install grid: only windows that some film quote tints.
+  const installSections = sections.filter((section) =>
+    filmQuotes.some((quote) => itemFor(quote, section)?.install),
+  );
+  // Listed on the one Removal line, front to back.
+  const removalSections = sections.filter(needsRemoval);
+  const showRemoval = removalSections.length > 0;
+
+  // Removal price and time are saved onto every quote of the request, so any quote's copy will do.
+  const savedRemoval = quotes[0]?.removal_price_cents ?? null;
+  const savedMinutes = quotes[0]?.duration_minutes ?? null;
+  const [removalInput, setRemovalInput] = useState(centsToInput(savedRemoval));
+  const [minutesInput, setMinutesInput] = useState(
+    savedMinutes === null ? "" : String(savedMinutes),
+  );
+  const typedRemoval = showRemoval ? dollarsToCents(removalInput) : null;
+  const typedMinutes = parseMinutes(minutesInput);
 
   // The price list stores front and rear sides as one row.
   const listSection = (section: string) =>
@@ -131,13 +145,6 @@ export default function PricingForm({
         price.section === listSection(section),
     );
 
-  // The install time for a vehicle type and window. It's the same for every film.
-  const installTimeFor = (type: string, section: string) =>
-    installTimes.find(
-      (time) =>
-        time.vehicle_type === type && time.section === listSection(section),
-    );
-
   // What the price list suggests for a vehicle type, as input strings.
   // Install is per item; minutes are shared per section.
   function presetValues(type: string | null) {
@@ -152,35 +159,9 @@ export default function PricingForm({
         if (match) install[item.id] = centsToInput(match.install_price_cents);
       }
     }
-    // Only windows getting new tint take an install time; removal-only windows are timed by hand.
-    for (const section of sections) {
-      if (!savedItems.some((item) => item.section === section && item.install))
-        continue;
-      const time = installTimeFor(type, section);
-      if (time) minutes[section] = String(time.install_duration_minutes);
-    }
     return { install, minutes };
   }
 
-  // Controlled so totals update as staff type. Saved values win; empty ones start from the price list.
-  const [sectionInputs, setSectionInputs] = useState<SectionInputs>(() => {
-    const preset = presetValues(vehicleType);
-    return Object.fromEntries(
-      sections.map((section) => {
-        const first = savedItems.find((item) => item.section === section)!;
-        return [
-          section,
-          {
-            removal_price: centsToInput(first.removal_price_cents),
-            minutes:
-              first.duration_minutes !== null
-                ? String(first.duration_minutes)
-                : (preset.minutes[section] ?? ""),
-          },
-        ];
-      }),
-    );
-  });
   const [installInputs, setInstallInputs] = useState<InstallInputs>(() => {
     const preset = presetValues(vehicleType);
     return Object.fromEntries(
@@ -200,24 +181,12 @@ export default function PricingForm({
     const next = presetValues(type);
 
     setInstallInputs((current) => ({ ...current, ...next.install }));
-    setSectionInputs((current) =>
-      Object.fromEntries(
-        Object.entries(current).map(([section, inputs]) => [
-          section,
-          { ...inputs, minutes: next.minutes[section] ?? inputs.minutes },
-        ]),
-      ),
-    );
   }
 
   // What a saved item would become if the typed values were saved now.
   function typed(item: PricingItem) {
     return {
       install: item.install ? dollarsToCents(installInputs[item.id]) : null,
-      removal: item.removal
-        ? dollarsToCents(sectionInputs[item.section].removal_price)
-        : null,
-      minutes: parseMinutes(sectionInputs[item.section].minutes),
     };
   }
 
@@ -225,31 +194,19 @@ export default function PricingForm({
   // the inputs hold what's typed. Sending uses the saved prices, so both must agree first.
   const hasUnsavedChanges =
     noteInput.trim() !== staffNote ||
+    typedRemoval !== (showRemoval ? savedRemoval : null) ||
+    typedMinutes !== savedMinutes ||
     savedItems.some((item) => {
       const now = typed(item);
-      return (
-        now.install !== item.install_price_cents ||
-        now.removal !== item.removal_price_cents ||
-        now.minutes !== item.duration_minutes
-      );
+      return now.install !== item.install_price_cents;
     });
-  const fullyPriced = savedItems.every(
-    (item) =>
-      (!item.install || item.install_price_cents !== null) &&
-      (!item.removal || item.removal_price_cents !== null) &&
-      item.duration_minutes !== null,
-  );
-
-  function setSectionInput(
-    section: string,
-    field: keyof SectionInputs[string],
-    value: string,
-  ) {
-    setSectionInputs((current) => ({
-      ...current,
-      [section]: { ...current[section], [field]: value },
-    }));
-  }
+  // Mirrors send_quote: every tinted window priced, a time, and a removal price if there's removal.
+  const fullyPriced =
+    savedItems.every(
+      (item) => !item.install || item.install_price_cents !== null,
+    ) &&
+    savedMinutes !== null &&
+    (!showRemoval || savedRemoval !== null);
 
   function handleSend() {
     if (!window.confirm("Send this quote? Prices lock once it's sent.")) return;
@@ -283,33 +240,19 @@ export default function PricingForm({
     else event.currentTarget.requestSubmit();
   }
 
-  // Removal and minutes are shared across films, so they're summed once per window (not per quote).
-  // Install prices differ per film, so each film quote gets its own total.
-  const totals = {
-    filmCents: {} as Record<string, number>, // full price per film: its installs + the shared removal
-    removalCents: 0,
-    minutes: 0,
-  };
-
-  // Shared values: once per window, so "Both" doesn't double them and Removal Only still counts.
-  for (const section of sections) {
-    const removal = needsRemoval(section)
-      ? dollarsToCents(sectionInputs[section].removal_price)
-      : null;
-    const minutes = parseMinutes(sectionInputs[section].minutes);
-    if (removal !== null && !Number.isNaN(removal))
-      totals.removalCents += removal;
-    if (minutes !== null && !Number.isNaN(minutes)) totals.minutes += minutes;
-  }
-
+  // Each film's total is its own installs plus the one removal price (every film quote
+  // includes the same removal work). Blank or invalid boxes count as 0 until fixed.
+  const removalCents =
+    typedRemoval !== null && !Number.isNaN(typedRemoval) ? typedRemoval : 0;
+  const filmTotals: Record<string, number> = {};
   for (const quote of filmQuotes) {
-    let cents = totals.removalCents; // every film quote includes the same removal work
+    let cents = removalCents;
     for (const item of quote.items) {
       const now = typed(item);
       if (now.install !== null && !Number.isNaN(now.install))
         cents += now.install;
     }
-    totals.filmCents[quote.film_type!] = cents;
+    filmTotals[quote.film_type!] = cents;
   }
 
   function priceInput(
@@ -317,15 +260,19 @@ export default function PricingForm({
     label: string,
     value: string,
     onChange: (value: string) => void,
+    {
+      placeholder = "0.00",
+      inputMode = "decimal" as "decimal" | "numeric",
+    } = {},
   ) {
     const error = state.errors[name];
     return (
       <>
         <input
           name={name}
-          inputMode="decimal"
+          inputMode={inputMode}
           enterKeyHint="next"
-          placeholder="0.00"
+          placeholder={placeholder}
           aria-label={label}
           value={value}
           onChange={(e) => onChange(e.target.value)}
@@ -367,155 +314,140 @@ export default function PricingForm({
           style={{ "--price-cols": columns } as React.CSSProperties}
           className="rounded-xl border border-zinc-800 bg-zinc-950 p-4"
         >
-          {/* Mobile: each window is its own stacked block. Desktop: one table-like grid. */}
-          <div className="grid grid-cols-1 items-start gap-y-5 md:grid-cols-(--price-cols) md:items-end md:gap-x-3 md:gap-y-0">
-            <span className="hidden pl-2 text-xs font-semibold uppercase tracking-wide text-zinc-500 md:block">
-              Window
-            </span>
-            {filmQuotes.map((quote) => (
-              <span
-                key={quote.id}
-                className={`${headerClass} ${filmColors[quote.film_type!]}`}
-              >
-                {filmLabels[quote.film_type!]} ($)
+          {/* Install prices. Mobile: each window is its own stacked block. Desktop: one table-like grid.
+            A removal-only request has nothing to tint, so the grid is skipped. */}
+          {installSections.length > 0 && (
+            <div className="grid grid-cols-1 items-start gap-y-5 md:grid-cols-(--price-cols) md:items-end md:gap-x-3 md:gap-y-0">
+              <span className="hidden pl-2 text-xs font-semibold uppercase tracking-wide text-zinc-500 md:block">
+                Window
               </span>
-            ))}
-            {showRemoval && (
-              <span className={`${headerClass} ${removalColor}`}>
-                Removal ($)
-              </span>
-            )}
-            <span className={`${headerClass} ${minutesColor}`}>Minutes</span>
-
-            {sections.map((section, idx) => {
-              const label = sectionLabels[section];
-              const minutesName = fieldName("minutes", section);
-              const minutesError = state.errors[minutesName];
-
-              return (
-                <div
-                  key={section}
-                  className={`grid grid-cols-2 gap-x-3 max-md:px-2 gap-y-2 rounded-lg py-2 md:col-span-full md:grid-cols-subgrid ${idx % 2 === 0 ? "max-md:bg-zinc-900" : ""}`}
+              {filmQuotes.map((quote) => (
+                <span
+                  key={quote.id}
+                  className={`${headerClass} ${filmColors[quote.film_type!]}`}
                 >
-                  <p className="col-span-2 font-bold md:col-span-1 md:self-start md:pt-2">
-                    {label}
-                  </p>
+                  {filmLabels[quote.film_type!]} ($)
+                </span>
+              ))}
 
-                  {/* Empty cells keep the desktop columns lined up; on mobile they're dropped. */}
-                  {filmQuotes.map((quote) => {
-                    const item = itemFor(quote, section);
-                    if (!item?.install) {
-                      return (
-                        <div
-                          key={quote.id}
-                          aria-hidden
-                          className="hidden md:block"
-                        />
-                      );
-                    }
-                    const film = filmLabels[quote.film_type!];
-                    return (
-                      <div key={quote.id} className="md:self-start">
-                        <span
-                          aria-hidden
-                          className={`${mobileLabelClass} ${filmColors[quote.film_type!]}`}
-                        >
-                          {film} ($)
-                        </span>
-                        {priceInput(
-                          fieldName("install_price", item.id),
-                          `${label} ${film} price`,
-                          installInputs[item.id],
-                          (value) =>
-                            setInstallInputs((current) => ({
-                              ...current,
-                              [item.id]: value,
-                            })),
-                        )}
-                      </div>
-                    );
-                  })}
+              {installSections.map((section, idx) => {
+                const label = sectionLabels[section];
+                return (
+                  <div
+                    key={section}
+                    className={`grid grid-cols-2 gap-x-3 max-md:px-2 gap-y-2 rounded-lg py-2 md:col-span-full md:grid-cols-subgrid ${idx % 2 === 0 ? "max-md:bg-zinc-900" : ""}`}
+                  >
+                    <p className="col-span-2 font-bold md:col-span-1 md:self-start md:pt-2">
+                      {label}
+                    </p>
 
-                  {showRemoval &&
-                    (needsRemoval(section) ? (
-                      <div className="md:self-start">
-                        <span
-                          aria-hidden
-                          className={`${mobileLabelClass} ${removalColor}`}
-                        >
-                          Removal ($)
-                        </span>
-                        {priceInput(
-                          fieldName("removal_price", section),
-                          `${label} removal price`,
-                          sectionInputs[section].removal_price,
-                          (value) =>
-                            setSectionInput(section, "removal_price", value),
-                        )}
-                      </div>
-                    ) : (
-                      <div aria-hidden className="invisible" />
-                    ))}
-
-                  <div className="md:self-start">
-                    <span
-                      aria-hidden
-                      className={`${mobileLabelClass} ${minutesColor}`}
-                    >
-                      Minutes
-                    </span>
-                    <input
-                      name={minutesName}
-                      inputMode="numeric"
-                      enterKeyHint="next"
-                      placeholder="0"
-                      aria-label={`${label} minutes`}
-                      value={sectionInputs[section].minutes}
-                      onChange={(e) =>
-                        setSectionInput(section, "minutes", e.target.value)
+                    {/* Empty cells keep the desktop columns lined up; on mobile they're dropped. */}
+                    {filmQuotes.map((quote) => {
+                      const item = itemFor(quote, section);
+                      if (!item?.install) {
+                        return (
+                          <div
+                            key={quote.id}
+                            aria-hidden
+                            className="hidden md:block"
+                          />
+                        );
                       }
-                      className={`${inputClass} ${minutesError ? "border-red-500" : "border-zinc-800"}`}
-                    />
-                    {minutesError && (
-                      <p className="mt-1 text-xs text-red-400">
-                        {minutesError}
-                      </p>
-                    )}
+                      const film = filmLabels[quote.film_type!];
+                      return (
+                        <div key={quote.id} className="md:self-start">
+                          <span
+                            aria-hidden
+                            className={`${mobileLabelClass} ${filmColors[quote.film_type!]}`}
+                          >
+                            {film} ($)
+                          </span>
+                          {priceInput(
+                            fieldName("install_price", item.id),
+                            `${label} ${film} price`,
+                            installInputs[item.id],
+                            (value) =>
+                              setInstallInputs((current) => ({
+                                ...current,
+                                [item.id]: value,
+                              })),
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
+          )}
+
+          {/* One removal price for the whole request, covering every window listed. The box is
+            7rem wide like the film columns, so its right edge lines up with them. */}
+          {showRemoval && (
+            <div
+              className={`flex items-start gap-3 max-md:px-2 ${installSections.length > 0 ? "mt-4 border-t border-zinc-800 pt-3" : ""}`}
+            >
+              <div className="min-w-0 flex-1 md:pl-2">
+                <p className={`font-bold ${removalColor}`}>Removal ($)</p>
+                <p className="text-sm text-zinc-400">
+                  {removalSections
+                    .map((section) => sectionLabels[section] ?? section)
+                    .join(", ")}
+                </p>
+              </div>
+              <div className="w-28 shrink-0">
+                {priceInput(
+                  "removalPrice",
+                  "Removal price",
+                  removalInput,
+                  setRemovalInput,
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* One total time for the whole job, whichever film the customer picks. */}
+          <div className="mt-4 flex items-start gap-3 border-t border-zinc-800 pt-3 max-md:px-2">
+            <div className="min-w-0 flex-1 md:pl-2">
+              <p className={`font-bold ${minutesColor}`}>Time (minutes)</p>
+              <p className="text-sm text-zinc-400">
+                {typedMinutes !== null && !Number.isNaN(typedMinutes)
+                  ? formatMinutes(typedMinutes)
+                  : "Total time for the whole job"}
+              </p>
+            </div>
+            <div className="w-28 shrink-0">
+              {priceInput(
+                "durationMinutes",
+                "Total minutes",
+                minutesInput,
+                setMinutesInput,
+                { placeholder: "0", inputMode: "numeric" },
+              )}
+            </div>
           </div>
 
-          {/* Totals line up under their columns. A film's total already includes removal,
-            so the removal cell only shows a number when removal is the whole job. */}
+          {/* Totals line up under their columns. Each film's total already includes removal;
+            a removal-only request shows the removal price as its total. */}
           <div className="mt-4 grid grid-cols-1 gap-y-1 border-t border-zinc-800 pt-3 md:grid-cols-(--price-cols) md:gap-x-3">
             <span className="font-semibold md:pl-2">Total</span>
 
-            {filmQuotes.map((quote) => (
+            {filmQuotes.length === 0 ? (
               <TotalCell
-                key={quote.id}
-                label={filmLabels[quote.film_type!]}
-                value={formatMoney(totals.filmCents[quote.film_type!])}
-                color={filmColors[quote.film_type!]}
-              />
-            ))}
-
-            {showRemoval && (
-              <TotalCell
-                label="Removal Only"
-                value={formatMoney(totals.removalCents)}
+                label="Removal"
+                value={formatMoney(removalCents)}
                 color={removalColor}
               />
+            ) : (
+              filmQuotes.map((quote) => (
+                <TotalCell
+                  key={quote.id}
+                  label={filmLabels[quote.film_type!]}
+                  value={formatMoney(filmTotals[quote.film_type!])}
+                  color={filmColors[quote.film_type!]}
+                />
+              ))
             )}
-
-            <TotalCell
-              label="Time"
-              color={minutesColor}
-              value={
-                totals.minutes > 0 ? `${formatMinutes(totals.minutes)}` : "—"
-              }
-            />
           </div>
 
           {/* Saved with the prices. A textarea, so Enter adds a line instead of jumping fields. */}
@@ -524,7 +456,7 @@ export default function PricingForm({
               htmlFor="staffNote"
               className="mb-1 block text-sm font-semibold md:pl-2"
             >
-              Staff note
+              Note To Customer
             </label>
             <textarea
               id="staffNote"
@@ -567,7 +499,8 @@ export default function PricingForm({
             ) : (
               !fullyPriced && (
                 <p className="text-sm text-zinc-400">
-                  Every window needs a price and time to send.
+                  Every tinted window needs a price, plus a time and removal
+                  price (if there&apos;s removal), to send.
                 </p>
               )
             )}

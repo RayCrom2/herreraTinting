@@ -26,23 +26,26 @@ export async function savePricing(_prevState: PricingState, formData: FormData):
 
   for (const quote of request.quotes) {
     for (const item of quote.quote_items) {
-      // Install price is per film (item id). Removal and minutes don't depend on the film,
-      // so the form has one box per window (section) and every quote's item gets that value.
+      // Install price is per film, so the form has one box per item (named by item id).
       const installName = fieldName("install_price", item.id);
-      const removalName = fieldName("removal_price", item.section);
-      const minutesName = fieldName("minutes", item.section);
-      // Only read a price for the work this row does; the schema requires the other to stay null.
+      // Only a window being tinted gets an install price; the schema requires it to stay null otherwise.
       const installPrice = item.install ? dollarsToCents(String(formData.get(installName) ?? "")) : null;
-      const removalPrice = item.removal ? dollarsToCents(String(formData.get(removalName) ?? "")) : null;
-      const minutes = parseMinutes(String(formData.get(minutesName) ?? ""));
 
       if (Number.isNaN(installPrice)) errors[installName] = "Enter a dollar amount, like 120 or 120.50.";
-      if (Number.isNaN(removalPrice)) errors[removalName] = "Enter a dollar amount, like 120 or 120.50.";
-      if (Number.isNaN(minutes)) errors[minutesName] = "Enter whole minutes above 0.";
 
-      itemRows.push({ ...item, install_price_cents: installPrice, removal_price_cents: removalPrice, duration_minutes: minutes });
+      itemRows.push({ ...item, install_price_cents: installPrice });
     }
   }
+
+  // Removal price and time are one box each for the whole request. Blank saves null (not set yet),
+  // which send_quote refuses; a request with no removal always saves a null removal price.
+  const hasRemoval = request.quotes.some((quote) => quote.quote_items.some((item) => item.removal));
+  const removalPrice = hasRemoval ? dollarsToCents(String(formData.get("removalPrice") ?? "")) : null;
+  const minutes = parseMinutes(String(formData.get("durationMinutes") ?? ""));
+
+  // Keys match the form's input names, so each message shows under its box.
+  if (Number.isNaN(removalPrice)) errors["removalPrice"] = "Enter a dollar amount, like 120 or 120.50.";
+  if (Number.isNaN(minutes)) errors["durationMinutes"] = "Enter whole minutes above 0.";
 
   if (Object.keys(errors).length > 0) {
     return { status: "error", message: "Fix the highlighted boxes, then save again.", errors };
@@ -55,15 +58,20 @@ export async function savePricing(_prevState: PricingState, formData: FormData):
     return { status: "error", message: "Something went wrong saving prices. Please try again.", errors: {} };
   }
 
-  // One note per request, written onto each of its quotes. Blank clears it.
+  // Removal price, time and note are per request, so every one of its quotes gets the same values.
+  // Blank note clears it.
   const staffNote = String(formData.get("staffNote") ?? "").trim().slice(0, 1000) || null;
-  const { error: noteError } = await supabase
+  const { error: quoteError } = await supabase
     .from("quotes")
-    .update({ staff_note: staffNote })
+    .update({ removal_price_cents: removalPrice, duration_minutes: minutes, staff_note: staffNote })
     .in("id", request.quotes.map((quote) => quote.id));
-  if (noteError) {
-    console.error("Failed to save staff note:", noteError);
-    return { status: "error", message: "Prices saved, but the note didn't. Save again.", errors: {} };
+  if (quoteError) {
+    console.error("Failed to save quote removal price, time and note:", quoteError);
+    return {
+      status: "error",
+      message: "Install prices saved, but removal, time and note didn't. Save again.",
+      errors: {},
+    };
   }
 
   refresh();
