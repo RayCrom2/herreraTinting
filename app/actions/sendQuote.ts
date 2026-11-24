@@ -25,8 +25,13 @@ export async function sendQuote(_prevState: SendState, formData: FormData): Prom
     if (error.message.includes("already sent")) {
       return { status: "error", message: "This quote was already sent.", url: null };
     }
-    if (error.message.includes("price and time")) {
-      return { status: "error", message: "Every window needs a saved price and time first.", url: null };
+    // Both of send_quote's readiness checks start with "Not ready to send:".
+    if (error.message.includes("Not ready to send")) {
+      return {
+        status: "error",
+        message: "Save every install price, the time, and the removal price (if there's removal) first.",
+        url: null,
+      };
     }
     console.error("Failed to send quote:", error);
     return { status: "error", message: "Something went wrong sending the quote. Please try again.", url: null };

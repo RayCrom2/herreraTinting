@@ -7,6 +7,7 @@ import {
   formatProperNoun,
   sectionLabels,
   sortBySection,
+  quoteTotalCents,
 } from "@/app/lib/quote";
 import { shopDayFormat, shopTimeFormat } from "@/app/lib/schedule";
 import type { BookingDetail } from "./calendar";
@@ -30,11 +31,10 @@ export default function BookingDetails({
     .filter(Boolean)
     .join(" ");
   const items = sortBySection(quote?.quote_items ?? []);
+  const installItems = items.filter((item) => item.install);
   const removal = items.some((item) => item.removal);
-  const removalCents = items.reduce(
-    (sum, item) => sum + (item.removal_price_cents ?? 0),
-    0,
-  );
+  const removalSections = items.filter((i) => i.removal).map((i) => i.section);
+  const total_price_cents = quote ? quoteTotalCents(quote) : null;
   const label = quote?.film_type
     ? `${filmLabels[quote.film_type] ?? quote.film_type}${removal ? " + removal" : ""}`
     : "Tint removal";
@@ -120,45 +120,45 @@ export default function BookingDetails({
               )}
             </div>
 
-            {/* Per-window prices, front of the car to back. A window can have both kinds of work. */}
             <ul className="mt-5 space-y-1 border-t border-zinc-800 pt-3 text-sm">
-              {items.map((item) => {
-                const work = [item.install && "Tint", item.removal && "Remove"]
-                  .filter(Boolean)
-                  .join(" + ");
-                const cents =
-                  (item.install_price_cents ?? 0) +
-                  (item.removal_price_cents ?? 0);
-                return (
-                  <li key={item.section} className="flex justify-between gap-4">
-                    <span>
-                      {sectionLabels[item.section] ?? item.section}
-                      <span className="text-zinc-500"> · {work}</span>
-                    </span>
-                    <span className="tabular-nums">{formatMoney(cents)}</span>
-                  </li>
-                );
-              })}
+              {installItems.map((item) => (
+                <li key={item.section} className="flex justify-between gap-4">
+                  <span>{sectionLabels[item.section] ?? item.section}</span>
+                  <span className="tabular-nums">
+                    {formatMoney(item.install_price_cents ?? 0)}
+                  </span>
+                </li>
+              ))}
+              {removal && (
+                <li className="min-w-0 flex-1 flex justify-between relative text-sm">
+                  <div>
+                    <p className={`text-rose-300`}>Removal</p>
+                    <p className="text-zinc-400">
+                      {removalSections
+                        .map((section) => sectionLabels[section] ?? section)
+                        .join(", ")}
+                    </p>
+                  </div>
+
+                  <span className="tabular-nums my-auto">
+                    {quote.removal_price_cents !== null
+                      ? formatMoney(quote.removal_price_cents)
+                      : "—"}
+                  </span>
+                </li>
+              )}
             </ul>
 
             <div className="mt-3 space-y-1 border-t border-zinc-800 pt-3">
               <p className="flex justify-between gap-4 font-bold">
                 <span>Total</span>
                 <span className="tabular-nums">
-                  {quote.total_cost_cents !== null
-                    ? formatMoney(quote.total_cost_cents)
+                  {total_price_cents !== null
+                    ? formatMoney(total_price_cents)
                     : "—"}
                 </span>
               </p>
-              {/* A removal-only quote's total is already all removal, so the subtotal would repeat it. */}
-              {quote.film_type && removalCents > 0 && (
-                <p className="flex justify-between gap-4 text-sm text-zinc-400">
-                  <span>Removal only</span>
-                  <span className="tabular-nums">
-                    {formatMoney(removalCents)}
-                  </span>
-                </p>
-              )}
+
               {quote.duration_minutes !== null && (
                 <p className="flex justify-between gap-4 text-sm text-zinc-400">
                   <span>Time</span>

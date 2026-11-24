@@ -39,7 +39,7 @@ export type BookingDetail = {
     quote_links: {
       quotes: {
         film_type: string | null;
-        total_cost_cents: number | null;
+        removal_price_cents: number | null;
         duration_minutes: number | null;
         staff_note: string | null;
         quote_items: {
@@ -47,7 +47,6 @@ export type BookingDetail = {
           install: boolean;
           removal: boolean;
           install_price_cents: number | null;
-          removal_price_cents: number | null;
         }[];
         quote_requests: {
           first_name: string;
@@ -100,7 +99,7 @@ export function groupByShopDay<T extends { starts_at: string; ends_at: string }>
 // Short labels and colours for the month view, where a cell is ~140px wide on desktop.
 // Keyed by film_type; null (removal-only) uses "removal". The day view can use the full filmLabels.
 export const JOB_STYLES: Record<string, { label: string; bgColor: string }> = {
-  "pronano-ceramic": { label: "Ceramic", bgColor: "bg-orange-400" },
+  "pronano-ceramic": { label: "Ceramic", bgColor: "bg-yellow-400" },
   "c2-carbon": { label: "Carbon", bgColor: "bg-blue-400" },
   removal: { label: "Removal", bgColor: "bg-rose-300" },
 };

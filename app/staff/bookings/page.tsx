@@ -93,8 +93,8 @@ async function loadBookingDetails(
     .select(
       `id, starts_at, ends_at, booking_links (
       quote_links ( quotes (
-        film_type, total_cost_cents, duration_minutes, staff_note,
-        quote_items ( section, install, removal, install_price_cents, removal_price_cents ),
+        film_type, removal_price_cents, duration_minutes, staff_note,
+        quote_items ( section, install, removal, install_price_cents ),
         quote_requests ( first_name, last_name, phone, vehicle_year, vehicle_make, vehicle_model, old_tint_condition, comment ))))`,
     )
     .eq("id", bookingId)
@@ -164,7 +164,7 @@ async function BookingsCalendar({
     .from("bookings")
     .select(
       `id, starts_at, ends_at, booking_links  (
-      quote_links ( quotes(film_type, quote_items(section, install, removal), quote_requests(id, first_name, last_name, phone, old_tint_condition, comment))))`,
+      quote_links ( quotes(film_type, removal_price_cents, duration_minutes, quote_items(section, install, removal), quote_requests(id, first_name, last_name, phone, old_tint_condition, comment))))`,
     )
     .eq(`status`, "scheduled")
     .gte("starts_at", rangeStart)

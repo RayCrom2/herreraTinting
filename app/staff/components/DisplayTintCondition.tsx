@@ -11,7 +11,7 @@ export default function DisplayTintCondition({
     return currentCondition.map((cur, idx) => {
       const condition = oldTintConditions.find((c) => c.value === cur);
       return (
-        <span className={condition?.color} key={cur}>
+        <span className="text-rose-300" key={cur}>
           {` ${condition?.label ?? cur}${idx !== len - 1 ? ", " : ""}`}
         </span>
       );

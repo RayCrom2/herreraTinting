@@ -50,7 +50,7 @@ async function QuoteRequestDetail({
       `
       id, created_at, first_name, last_name, phone,
       vehicle_type, vehicle_year, vehicle_make, vehicle_model, removal_request, old_tint_condition, comment, replied_at,
-      quotes ( id, film_type, staff_note, quote_items ( id, section, install, removal, install_price_cents, removal_price_cents, duration_minutes ) )
+      quotes ( id, film_type, removal_price_cents, duration_minutes, staff_note, quote_items ( id, section, install, removal, install_price_cents ) )
     `,
     )
     .eq("id", requestId)
@@ -65,18 +65,20 @@ async function QuoteRequestDetail({
     throw new Error(`Failed to load prices: ${pricesError.message}`);
   if (!prices) notFound();
 
-  const { data: installTimes, error: installTimesError } = await supabase
-    .from("install_times")
-    .select(`vehicle_type, section, install_duration_minutes`);
-  if (installTimesError)
-    throw new Error(
-      `Failed to load install times: ${installTimesError.message}`,
-    );
-  if (!installTimes) notFound();
+  // const { data: installTimes, error: installTimesError } = await supabase
+  //   .from("install_times")
+  //   .select(`vehicle_type, section, install_duration_minutes`);
+  // if (installTimesError)
+  //   throw new Error(
+  //     `Failed to load install times: ${installTimesError.message}`,
+  //   );
+  // if (!installTimes) notFound();
 
   const quotes: PricingQuote[] = sortByFilm(request.quotes).map((quote) => ({
     id: quote.id,
     film_type: quote.film_type,
+    removal_price_cents: quote.removal_price_cents,
+    duration_minutes: quote.duration_minutes,
     items: sortBySection(quote.quote_items),
   }));
   /* ex:
@@ -150,7 +152,6 @@ async function QuoteRequestDetail({
         customer={{ firstName: request.first_name, phone: request.phone }}
         vehicleType={vehicleType}
         prices={prices}
-        installTimes={installTimes}
         currentCondition={request.old_tint_condition}
         staffNote={staffNote}
       />
