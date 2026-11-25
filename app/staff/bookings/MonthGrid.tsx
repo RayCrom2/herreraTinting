@@ -13,6 +13,7 @@ import {
   type StaffBooking,
 } from "./calendar";
 import CalendarHeader, { bookingHref, viewHref } from "./CalendarHeader";
+import { shortBookingTime } from "@/app/lib/booking";
 
 // "2026-11" + 1 -> "2026-12", "2026-01" - 1 -> "2025-12". Day 1 of the month, so no day overflow.
 function addMonths(month: string, n: number): string {
@@ -113,12 +114,15 @@ export default function MonthGrid({
           const dayIsToday = date === today;
           const closed = isClosed(date);
           const dayBookings = byDay.get(date) ?? [];
+          const hasShortBooking = dayBookings.find(
+            (b) => b.endMinutes - b.startMinutes < shortBookingTime,
+          );
           return (
             <div
               key={date}
               className={`min-h-16 p-1 md:min-h-28 md:p-2 ${
                 closed ? "bg-zinc-900/60" : "bg-background"
-              } ${inMonth ? "" : "text-zinc-600"}`}
+              } ${inMonth ? "" : "text-zinc-600"} ${hasShortBooking ? "max-md:border max-md:border-red-600" : ""}`}
             >
               <Link
                 href={`/staff/bookings?view=day&date=${date}`}
@@ -134,16 +138,19 @@ export default function MonthGrid({
               {/* Desktop: one truncated line per booking (at most two a day: two slots).
                   Each opens that booking's details over the month. */}
               <ul className="mt-1 hidden space-y-1 md:block">
-                {dayBookings.map(({ booking, startMinutes }) => {
+                {dayBookings.map(({ booking, startMinutes, endMinutes }) => {
                   const job = jobStyle(
                     booking.booking_links.quote_links.quotes?.film_type,
                   );
+                  const isShortBooking =
+                    endMinutes - startMinutes <= shortBookingTime;
+
                   return (
                     <li key={booking.id}>
                       <Link
                         href={bookingHref(viewUrl, booking.id)}
                         scroll={false}
-                        className="flex items-center gap-1.5 rounded px-1 py-0.5 text-xs hover:bg-zinc-800"
+                        className={`flex items-center gap-1.5 rounded px-1 py-0.5 text-xs hover:bg-zinc-800 ${isShortBooking ? "border border-red-600" : ""}`}
                       >
                         <span
                           className={`size-2 shrink-0 rounded-full ${job.bgColor}`}
@@ -163,17 +170,19 @@ export default function MonthGrid({
               {/* Mobile: a dot per booking; tapping the day number opens the day view. */}
               {dayBookings.length > 0 && (
                 <div className="mt-1 flex justify-center gap-1 md:hidden">
-                  {dayBookings.map(({ booking }) => (
-                    <span
-                      key={booking.id}
-                      aria-hidden
-                      className={`size-1.5 rounded-full ${
-                        jobStyle(
-                          booking.booking_links.quote_links.quotes?.film_type,
-                        ).bgColor
-                      }`}
-                    />
-                  ))}
+                  {dayBookings.map(({ booking, startMinutes, endMinutes }) => {
+                    return (
+                      <span
+                        key={booking.id}
+                        aria-hidden
+                        className={`size-1.5 rounded-full ${
+                          jobStyle(
+                            booking.booking_links.quote_links.quotes?.film_type,
+                          ).bgColor
+                        }`}
+                      />
+                    );
+                  })}
                   <span className="sr-only">
                     {dayBookings.length} booking
                     {dayBookings.length > 1 ? "s" : ""}
