@@ -21,6 +21,13 @@ export default function StaffLayout({
           <Link href="/staff" className="font-semibold hover:text-red-400">
             Herrera Tinting · Staff
           </Link>
+          <span>※</span>
+          <Link
+            href="/staff/bookings"
+            className="font-semibold hover:text-red-400"
+          >
+            Booking Calendar
+          </Link>
           {/* <nav className="flex gap-4 text-sm text-zinc-400">
             <Link href="/staff" className="hover:text-zinc-100">
               Open quotes
@@ -44,7 +51,9 @@ export default function StaffLayout({
       {/* No max-w here: each page sets its own width (bookings is wider than the quote pages). */}
       <main className="px-4 py-8">
         <Suspense
-          fallback={<p className="mx-auto max-w-5xl text-zinc-400">Loading...</p>}
+          fallback={
+            <p className="mx-auto max-w-5xl text-zinc-400">Loading...</p>
+          }
         >
           {children}
         </Suspense>
