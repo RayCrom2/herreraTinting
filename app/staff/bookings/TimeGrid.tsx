@@ -13,6 +13,7 @@ import {
   type StaffBooking,
 } from "./calendar";
 import { filmLabels } from "@/app/lib/quote";
+import { shortBookingTime } from "@/app/lib/booking";
 
 const calendarRange: { open: number; close: number } = {
   open: 480,
@@ -110,6 +111,7 @@ function DisplayBooking({
     .join(" ");
   const detailsHref = bookingHref(viewUrl, booking.id);
   const time = `${shortTime(startMinutes)}–${shortTime(endMinutes)}`;
+  const isShortBooking = endMinutes - startMinutes < shortBookingTime;
 
   // Shared by every version: colour, position from the time math, and clipping.
   const block = `absolute inset-x-1 min-h-11 overflow-hidden rounded text-left text-zinc-950 ${jobStyle(quote?.film_type).bgColor}`;
@@ -125,7 +127,7 @@ function DisplayBooking({
       <Link
         href={detailsHref}
         scroll={false}
-        className={`${block} border-l-4 border-zinc-950/30 p-3 text-sm hover:brightness-110 md:px-4 md:text-base`}
+        className={`${block} border border-zinc-950/30 ${isShortBooking ? "outline-3 outline-offset-2 outline-red-600" : ""} p-3 text-sm hover:brightness-110 md:px-4 md:text-base`}
         style={position}
       >
         <div className="flex items-baseline gap-3">
@@ -145,7 +147,7 @@ function DisplayBooking({
       <Link
         href={detailsHref}
         scroll={false}
-        className={`${block} hidden space-y-0.5 p-1.5 text-xs hover:brightness-110 md:block`}
+        className={`${block} ${isShortBooking ? "outline-2 outline-offset-2 outline-red-600" : ""} hidden space-y-0.5 p-1.5 text-xs hover:brightness-110 md:block`}
         style={position}
       >
         <p className="font-semibold opacity-75">{time}</p>
