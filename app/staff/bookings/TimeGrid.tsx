@@ -159,7 +159,7 @@ function DisplayBooking({
       <Link
         href={detailsHref}
         scroll={false}
-        className={`${block} px-0.5 pt-0.5 text-[10px] leading-tight font-medium md:hidden`}
+        className={`${block} ${isShortBooking ? "outline-2 outline-offset-2 outline-red-600" : ""} px-0.5 pt-0.5 text-[10px] leading-tight font-medium md:hidden`}
         style={position}
       >
         <span className="block break-words font-semibold">{time}</span>
