@@ -8,6 +8,7 @@ import { supabase as admin } from "@/app/lib/supabase/admin";
 import { filmLabels, formatMinutes, formatProperNoun } from "@/app/lib/quote";
 import { shopDayFormat, shopTimeFormat, toShopTime } from "@/app/lib/schedule";
 import { BookingsByDate } from "@/app/lib/booking";
+import SaveLink from "./SaveLink";
 
 export const metadata: Metadata = {
   title: "Book Your Herrera Tinting Appointment",
@@ -213,6 +214,7 @@ async function BookAppointment({
         <dt className="text-zinc-400">Takes about</dt>
         <dd className="font-medium">{formatMinutes(duration)}</dd>
       </dl>
+      <SaveLink expiresOn={shopDayFormat.format(new Date(link.expires_at))} />
 
       <div className="mt-8">
         <DatePicker
