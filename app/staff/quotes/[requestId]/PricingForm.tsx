@@ -279,7 +279,7 @@ export default function PricingForm({
           aria-label={label}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className={`${inputClass} ${error ? "border-red-500" : isModified ? "border-amber-400 opacity-55" : "border-zinc-800"}`}
+          className={`${inputClass} ${error ? "border-red-500" : isModified ? "border-amber-400 border-opacity-55" : "border-zinc-800"}`}
         />
         {error && <p className="mt-1 text-xs text-red-400">{error}</p>}
       </>
