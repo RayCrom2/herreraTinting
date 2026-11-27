@@ -31,7 +31,7 @@ const mobileLabelClass = "mb-1 block text-xs md:hidden";
 // One color per column, shared by the desktop headers, mobile labels and totals.
 const filmColors: Record<string, string> = {
   "c2-carbon": "text-blue-400",
-  "pronano-ceramic": "text-yellow-400",
+  "pronano-ceramic": "text-orange-400",
 };
 const removalColor = "text-rose-300";
 const minutesColor = "text-green-400";
@@ -91,6 +91,8 @@ export default function PricingForm({
 
   // Every window on the request, front to back, and which quote's item covers it.
   const savedItems = quotes.flatMap((quote) => quote.items);
+  console.log(savedItems);
+
   const [preset, setPreset] = useState(vehicleType);
   const [noteInput, setNoteInput] = useState(staffNote);
 
@@ -173,6 +175,9 @@ export default function PricingForm({
       ]),
     );
   });
+
+  // const isModified = (installInputs, )
+  console.log(installInputs);
 
   // Picking a type overwrites install prices and minutes with the price list.
   // Anything without a matching row keeps whatever is already typed.
@@ -259,6 +264,7 @@ export default function PricingForm({
     name: string,
     label: string,
     value: string,
+    isModified: boolean,
     onChange: (value: string) => void,
     {
       placeholder = "0.00",
@@ -276,7 +282,7 @@ export default function PricingForm({
           aria-label={label}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className={`${inputClass} ${error ? "border-red-500" : "border-zinc-800"}`}
+          className={`${inputClass} ${error ? "border-red-500" : isModified ? "border-amber-400 opacity-55" : "border-zinc-800"}`}
         />
         {error && <p className="mt-1 text-xs text-red-400">{error}</p>}
       </>
@@ -358,14 +364,18 @@ export default function PricingForm({
                         <div key={quote.id} className="md:self-start">
                           <span
                             aria-hidden
-                            className={`${mobileLabelClass} ${filmColors[quote.film_type!]}`}
+                            className={`${mobileLabelClass} ${filmColors[quote.film_type!]} `}
                           >
                             {film} ($)
                           </span>
+                          {console.log("leftOp:", typed(item).install, item.install_price_cents)}
+                          {console.log("rightOp:", item.install_price_cents)}
+
                           {priceInput(
                             fieldName("install_price", item.id),
                             `${label} ${film} price`,
                             installInputs[item.id],
+                            typed(item).install !== item.install_price_cents,
                             (value) =>
                               setInstallInputs((current) => ({
                                 ...current,
@@ -400,6 +410,7 @@ export default function PricingForm({
                   "removalPrice",
                   "Removal price",
                   removalInput,
+                  typedRemoval !== savedRemoval,
                   setRemovalInput,
                 )}
               </div>
@@ -421,6 +432,7 @@ export default function PricingForm({
                 "durationMinutes",
                 "Total minutes",
                 minutesInput,
+                typedMinutes !== savedMinutes,
                 setMinutesInput,
                 { placeholder: "0", inputMode: "numeric" },
               )}
