@@ -91,7 +91,6 @@ export default function PricingForm({
 
   // Every window on the request, front to back, and which quote's item covers it.
   const savedItems = quotes.flatMap((quote) => quote.items);
-  console.log(savedItems);
 
   const [preset, setPreset] = useState(vehicleType);
   const [noteInput, setNoteInput] = useState(staffNote);
@@ -176,8 +175,6 @@ export default function PricingForm({
     );
   });
 
-  // const isModified = (installInputs, )
-  console.log(installInputs);
 
   // Picking a type overwrites install prices and minutes with the price list.
   // Anything without a matching row keeps whatever is already typed.
@@ -368,8 +365,6 @@ export default function PricingForm({
                           >
                             {film} ($)
                           </span>
-                          {console.log("leftOp:", typed(item).install, item.install_price_cents)}
-                          {console.log("rightOp:", item.install_price_cents)}
 
                           {priceInput(
                             fieldName("install_price", item.id),
